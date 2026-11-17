@@ -57,7 +57,7 @@ export async function execute(input) {
       const parsed = new URL(url);
       if (parsed.origin !== 'http://127.0.0.1:8892' || parsed.pathname !== '/api/media/inspect') throw Error('UNSUPPORTED_PRIVATE_OPERATION');
       const request = JSON.parse(options.body);
-      if (request.mediaAssetId !== input.sourceId || request.startSecs < 0 || request.endSecs <= request.startSecs || request.endSecs - request.startSecs > 60 || request.endSecs > raw.durationMs / 1000 || ++inspections > 2) {
+      if (request.mediaAssetId !== input.sourceId || request.startSecs < 0 || request.endSecs <= request.startSecs || request.endSecs - request.startSecs > 60 + 1e-6 || request.endSecs > raw.durationMs / 1000 || ++inspections > 2) {
         return Response.json({ error: 'Bounded inspection limit reached.' }, { status: 422 });
       }
       actions.push({ action: 'inspectVideoKnowledge', startMs: request.startSecs * 1000, endMs: request.endSecs * 1000 });

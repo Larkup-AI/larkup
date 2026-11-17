@@ -45,6 +45,7 @@ FUNCTION_NAME = "process_video_job"
 MATERIALIZATION_FUNCTION_NAME = "materialize_remote_video_job"
 PROGRESS_DICT_NAME = "larkup-video-intelligence-progress"
 GPU_TYPE = "T4"
+GPU_TYPES = [GPU_TYPE, "L4"]
 GPU_MAX_CONTAINERS = 1
 MATERIALIZATION_MAX_CONTAINERS = 4
 GPU_IDLE_TIMEOUT_SECONDS = 15 * 60
@@ -107,9 +108,9 @@ app = modal.App(APP_NAME)
 @app.function(
     image=WORKER_IMAGE,
     secrets=[modal.Secret.from_name("larkup-video-proxy")],
-    # A single T4 keeps this batch-oriented workload on a modest GPU class.
+    # One worker prefers T4 and can use L4 when T4 capacity is unavailable.
     # It scales from zero, so idle GPU time is not billed.
-    gpu=GPU_TYPE,
+    gpu=GPU_TYPES,
     max_containers=GPU_MAX_CONTAINERS,
     timeout=6 * 60 * 60,
     # Reuse a container briefly for follow-up work, then release the GPU.

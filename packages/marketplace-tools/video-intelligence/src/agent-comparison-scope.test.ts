@@ -54,6 +54,25 @@ describe('comparison inspection scope', () => {
                 createdAt: '2026-01-01',
               },
             },
+            ...(explicit
+              ? [
+                  {
+                    evidence: {
+                      id: 'other-scene',
+                      modality: 'visual',
+                      timeRange: {
+                        startSecs: at < 1200 ? 1900 : 100,
+                        endSecs: at < 1200 ? 1910 : 110,
+                      },
+                      payload: {
+                        text: 'A more richly described but different subject performs a similar action.',
+                      },
+                      confidence: { score: 0.99 },
+                      createdAt: '2026-01-01',
+                    },
+                  },
+                ]
+              : []),
           ],
           reWatch,
         },

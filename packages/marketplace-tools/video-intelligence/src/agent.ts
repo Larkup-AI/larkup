@@ -16,7 +16,7 @@ const MAX_PARALLEL_INSPECTIONS = 4;
 /** The whole evidence-query fallback shares one deadline, including re-watch. */
 const INTERACTIVE_INSPECTION_BUDGET_MS = 40_000;
 /** Leave part of the shared deadline for a provider-backed inspection if needed. */
-const INTERACTIVE_REWATCH_BUDGET_MS = 12_000;
+const INTERACTIVE_REWATCH_BUDGET_MS = 30_000;
 
 type InspectionPurpose = 'verify-visual' | 'high-res-ocr' | 'compare' | 'count' | 'track' | 'code';
 type AnalysisMode = 'fast' | 'balanced' | 'thorough';
@@ -434,8 +434,13 @@ export function attachVideoIntelligenceAgentClient(
           const established = readings.filter(
             (reading) => reading.settlesQuestion && reading.found.trim(),
           );
-          if (established.length > 0) {
-            const supportingClip = established[0].range;
+          const observed = readings.filter(
+            (reading) => !('error' in reading && reading.error) && reading.found.trim(),
+          );
+          const paired = plan.requiresBothRanges && observed.length >= 2;
+          if (established.length > 0 || paired) {
+            const returnedReadings = paired ? observed : established;
+            const supportingClip = returnedReadings[0].range;
             const observedSubjects = observedSubjectsForAnswer(
               aggregate,
               focusedInput.investigation,
@@ -457,15 +462,18 @@ export function attachVideoIntelligenceAgentClient(
               ui: citationSurface(
                 asset,
                 context,
-                established.map((reading) => ({
+                returnedReadings.map((reading) => ({
                   modality: 'visual',
                   timeRange: { ...reading.range, precision: 'estimated' },
                 })),
                 supportingClip,
               ),
               directObservation: {
-                readings: established,
+                readings: returnedReadings,
                 rule:
+                  (established.length === 0
+                    ? 'No individual reading settles the full comparison. Combine only the observed states, and keep missing subjects or attributes unresolved. '
+                    : '') +
                   'These are direct readings taken by re-watching the source just now, for this ' +
                   'question. Answer from them and cite the timestamps they came from, and do not ' +
                   'report that the source fails to show something a reading here establishes. ' +
@@ -481,14 +489,17 @@ export function attachVideoIntelligenceAgentClient(
               },
               ...temporalContextResult(hits, plan),
               claimVerification: {
-                status: 'directly-established',
-                directlyEstablished: true,
-                rule: 'The source was re-watched for this question; answer from what it established.',
+                status: established.length > 0 ? 'directly-established' : 'needs-corroboration',
+                directlyEstablished: established.length > 0,
+                rule:
+                  established.length > 0
+                    ? 'The source was re-watched for this question; answer from what it established.'
+                    : 'These are complementary observations from separate source windows. Compare only their observed states; no individual window established the full relationship. State any remaining gap.',
               },
               investigation: {
                 answerPath: 'rag+rewatch',
                 responseTimeMs: Date.now() - startedAt,
-                analyzedRanges: established.map((reading) => reading.range),
+                analyzedRanges: returnedReadings.map((reading) => reading.range),
                 broadCoverage: plan.requiresBroadCoverage === true,
                 coverage: investigation?.coverage,
                 directive: investigationDirectiveForOutput(focusedInput.investigation),
@@ -643,6 +654,21 @@ export function attachVideoIntelligenceAgentClient(
  * matter.
  */
 function windowObjective(plan: VideoPlan): string | undefined {
+  if (plan.investigation?.goal === 'compare') {
+    return (
+      'For each requested state or label visible in this window, record the requested subject and property at that time. ' +
+      'Record a visible state even when the other comparison state lies outside this window. ' +
+      'Separate what is visible here from any unobserved transition, and never substitute a different subject.'
+    );
+  }
+  if (plan.investigation?.goal === 'resolve') {
+    return (
+      'Resolve the exact requested detail for the subject matching every qualifier in the question. ' +
+      'Do not substitute a similar person with conflicting clothing, action, or position. ' +
+      'For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; ' +
+      'an unknown original hue does not erase an observable light or dark appearance.'
+    );
+  }
   if (plan.subjectName) {
     return `Which visible person is "${plan.subjectName}", and what the question asks about them.`;
   }
@@ -1225,7 +1251,7 @@ function assessEvidence(
   // A resolve directive records an outstanding evidence gap. A relevant
   // indexed scene locates that gap; only a question-specific observation can
   // close it. Do not let generic summaries or retrieval scores close it again.
-  if (plan.investigation?.goal === 'resolve') {
+  if (plan.investigation?.goal === 'resolve' || plan.investigation?.goal === 'compare') {
     return {
       needsBreadth,
       coverageRatio: 1,
@@ -1873,6 +1899,25 @@ function inspectionTargets(
     : plan.requiresBothRanges || plan.kinds.includes('outcome')
       ? 3
       : 2;
+  const requestedScope = directiveTimeRange(plan.investigation, durationSecs);
+  if (requestedScope.length > 0) {
+    // An explicit source range bounds every inspection, including fallback
+    // looks. Similar subjects elsewhere cannot establish this scene's detail.
+    const chunks = requestedScope.flatMap((range) =>
+      splitRange(range.startSecs, range.endSecs, MAX_INSPECTION_CHUNK_SECS),
+    );
+    if (plan.requiresBothRanges && !assessment.needsBreadth && chunks.length > 1) {
+      const last = requestedScope[requestedScope.length - 1];
+      return uniqueRanges([
+        chunks[0],
+        {
+          startSecs: Math.max(last.startSecs, last.endSecs - MAX_INSPECTION_CHUNK_SECS),
+          endSecs: last.endSecs,
+        },
+      ]);
+    }
+    return evenlySpaced(chunks, budget);
+  }
   const fromHits = rangesAroundHits(hits, durationSecs, budget * 2);
   const fromHierarchy = (investigation?.candidateRanges ?? []).map((range) => ({
     startSecs: Math.max(0, range.startSecs),
