@@ -1,0 +1,58 @@
+[
+  {
+    "id": "synthetic-order",
+    "prediction": {
+      "predicted_sequence": [
+        "event-move",
+        "event-start",
+        "event-stop"
+      ]
+    }
+  },
+  {
+    "id": "synthetic-retrieval",
+    "prediction": {
+      "retrieved_ids": [
+        "record-2",
+        "record-3",
+        "record-1"
+      ]
+    }
+  },
+  {
+    "id": "synthetic-inventory",
+    "prediction": {
+      "predicted_fact_ids": [
+        "fact-1",
+        "fact-2"
+      ]
+    }
+  },
+  {
+    "id": "synthetic-visual",
+    "prediction": {
+      "predicted": {
+        "shape.color": "blue"
+      }
+    }
+  },
+  {
+    "id": "synthetic-inspection",
+    "prediction": {
+      "events": [
+        {
+          "event": "inspection_submitted",
+          "job_id": "demo-job"
+        },
+        {
+          "event": "inspection_completed",
+          "job_id": "demo-job"
+        },
+        {
+          "event": "evidence_requeried",
+          "job_id": "demo-job"
+        }
+      ]
+    }
+  }
+]
