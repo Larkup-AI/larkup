@@ -1121,10 +1121,7 @@ function assessEvidence(
         .map((hit) => Math.floor(hit.evidence.timeRange.startSecs / 15)),
     ).size;
     const sequenceReady = !plan.kinds.includes('state-change') || distinctMoments >= 3;
-    const reconciledSequenceReady =
-      plan.kinds.includes('state-change') &&
-      distinctMoments >= 3 &&
-      answerBearing.every((hit) => hit.evidence.source?.provider === 'video-intelligence-index');
+    // Index provenance does not prove source-wide temporal coverage.
     return {
       needsBreadth,
       coverageRatio,
@@ -1138,11 +1135,10 @@ function assessEvidence(
             ? answerBearing.length > 0
             : plan.kinds.includes('evaluation')
               ? evaluationEvidenceReady(answerBearing)
-              : reconciledSequenceReady ||
-                (answerBearing.length >= 3 &&
-                  coverageRatio >= 0.6 &&
-                  hierarchyReady &&
-                  sequenceReady),
+              : answerBearing.length >= 3 &&
+                coverageRatio >= 0.6 &&
+                hierarchyReady &&
+                sequenceReady,
     };
   }
 

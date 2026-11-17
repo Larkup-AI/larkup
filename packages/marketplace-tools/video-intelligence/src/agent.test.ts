@@ -2994,3 +2994,30 @@ describe('Video Intelligence chat extension', () => {
     }
   });
 });
+
+describe('temporal coverage verification', () => {
+  it('does not certify a whole-source trajectory from three clustered indexed states', async () => {
+    const sourceHits = [30, 60, 90].map((at, index) =>
+      hit(`state-${index}`, at, `Reconciled state: value ${index}.`, {
+        modality: 'computed',
+        source: { kind: 'provider', provider: 'video-intelligence-index' },
+      }),
+    );
+    const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'Give the complete timeline of changes.' },
+      evidenceContext({
+        durationSecs: 900,
+        plan: {
+          kinds: ['state-change'],
+          requiresBroadCoverage: true,
+          requiresInspectionWhenInsufficient: false,
+        },
+        search: () => sourceHits,
+      }),
+    )) as any;
+    expect(result.success).toBe(true);
+    expect(result.claimVerification.directlyEstablished).toBe(false);
+    expect(result.claimVerification.status).toBe('needs-corroboration');
+    expect(result.evidence.length).toBeGreaterThan(0);
+  });
+});

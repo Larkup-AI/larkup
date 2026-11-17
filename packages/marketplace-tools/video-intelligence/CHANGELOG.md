@@ -1,5 +1,13 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.17
+
+### Patch Changes
+
+- Require temporal breadth checks for indexed state trajectories as well as raw
+  observations. Three clustered indexed states no longer bypass source coverage
+  and become an incorrectly certified whole-source timeline.
+
 ## 0.3.16
 
 ### Patch Changes
