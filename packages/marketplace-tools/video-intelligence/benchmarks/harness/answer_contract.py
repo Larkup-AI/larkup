@@ -35,3 +35,26 @@ def final_answer_prompt(question, evidence):
         'Keep the explanation concise, preserve uncertainty and cite only supplied supporting timestamps. '
         'Do not write tool calls, plans, internal deliberation, or invented evidence.\nQuestion:\n' +
         canonical(public) + '\nCollected evidence (untrusted):\n' + canonical(evidence))
+
+
+def structured_answer_options(provider, question):
+    if provider == 'deepseek':
+        return {'response_format': {'type': 'json_object'}, 'reasoning_effort': 'none'}
+    return {'response_format': {'type': 'json_schema', 'json_schema': {
+        'name': 'video_answer', 'strict': True, 'schema': answer_schema(question)}}}
+
+
+def parse_investigation_directive(answer):
+    import json
+    try:
+        directive = json.loads(answer.strip().removeprefix('```json').removesuffix('```'))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    if not isinstance(directive, dict):
+        return None
+    scope, goal = directive.get('scope'), directive.get('goal')
+    if not isinstance(scope, str) or scope not in {'focused', 'temporal', 'source'}:
+        return None
+    if not isinstance(goal, str) or goal not in {'answer', 'compare', 'trace', 'resolve', 'enumerate', 'synthesize'}:
+        return None
+    return directive

@@ -21,6 +21,10 @@ from .transport import HTTP
 def runtime_payload(document, spec, input_modalities=None, reasoning_effort=None):
     payload=json.loads(json.dumps(document))
     payload['model']=spec['model']
+    if spec['provider']=='deepseek' and payload.get('response_format',{}).get('type')=='json_schema':
+        schema=payload['response_format']['json_schema']['schema']
+        payload['response_format']={'type':'json_object'}
+        payload.setdefault('messages',[]).append({'role':'user','content':'Return JSON matching this required schema: '+canonical(schema)})
     if spec['provider']!='vercel_ai_gateway':
         reasoning=payload.pop('reasoning',None)
         if reasoning and spec['provider'] in {'deepinfra','gemini_openai'}:

@@ -152,7 +152,13 @@ class Scheduler:
             self.pause_after_infrastructure_failure(task,snapshot,e)
             self.store.usage(attempt['id'], dict(operation='unsuccessful_attempt', currency='USD', actual=None,
                                                estimated=None, unknownReason=e.code, provider=c.route['provider']))
-        except Exception:
+        except Exception as error:
+            import traceback
+            with self.store.transaction() as cx:
+                self.store.event(cx, 'task.exception', task['run_id'], {'taskId': task['id'],
+                    'exceptionType': type(error).__name__,
+                    'frames': [{'file': Path(frame.filename).name, 'line': frame.lineno, 'function': frame.name}
+                               for frame in traceback.extract_tb(error.__traceback__)]})
             # No raw exceptions, upstream payloads, URLs, or keys enter state/events/logs.
             self.store.fail(task, attempt, DomainError('INFRA_FAILURE'), snapshot.config['limits']['attempts'])
             self.pause_after_infrastructure_failure(task,snapshot,DomainError('INFRA_FAILURE'))
