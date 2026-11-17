@@ -172,6 +172,7 @@ async function lookAtRange(input: {
   question: string;
   transcript?: string;
   model: ReturnType<typeof createChatModel>;
+  maxRetries?: number;
   signal?: AbortSignal;
 }): Promise<QuickLookFinding> {
   const startedAt = Date.now();
@@ -249,6 +250,7 @@ async function lookAtRange(input: {
 
     const { text, usage } = await generateText({
       model: input.model as Parameters<typeof generateText>[0]['model'],
+      maxRetries: input.maxRetries ?? 2,
       abortSignal: input.signal,
       messages: [{ role: 'user', content: content as never }],
     });
@@ -303,19 +305,25 @@ export async function quickLook(input: {
   /** Speech aligned to each range, when the caller already holds it. */
   transcriptFor?: (range: QuickLookRange) => string | undefined;
   signal?: AbortSignal;
+  /** Explicit request-scoped model; avoids ambient credentials for isolated hosts. */
+  model?: ReturnType<typeof createChatModel>;
+  maxRetries?: number;
 }): Promise<QuickLookFinding[]> {
   const ranges = input.ranges
     .filter((range) => Number.isFinite(range.startSecs) && range.endSecs > range.startSecs)
     .slice(0, 4);
   if (ranges.length === 0) return [];
-  const config = await readConfig();
-  const resolved = resolveConfiguredVisionModel(config, await getModelsByType('language'));
-  const model = createChatModel(
-    resolved.provider,
-    resolved.modelId,
-    resolved.apiKey,
-    config.customVisionModels,
-  );
+  let model = input.model;
+  if (!model) {
+    const config = await readConfig();
+    const resolved = resolveConfiguredVisionModel(config, await getModelsByType('language'));
+    model = createChatModel(
+      resolved.provider,
+      resolved.modelId,
+      resolved.apiKey,
+      config.customVisionModels,
+    );
+  }
   return Promise.all(
     ranges.map((range) =>
       lookAtRange({
@@ -324,6 +332,7 @@ export async function quickLook(input: {
         question: input.question,
         transcript: input.transcriptFor?.(range),
         model,
+        maxRetries: input.maxRetries,
         signal: input.signal,
       }),
     ),

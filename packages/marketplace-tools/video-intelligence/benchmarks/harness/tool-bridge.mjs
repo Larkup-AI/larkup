@@ -103,6 +103,9 @@ export async function execute(input) {
     const context = { origin: 'http://127.0.0.1:8892', projectId: 'isolated-video-benchmark', mediaEvidence: {
       getAsset: async (id) => id === input.sourceId ? { id, type: 'video', processingStatus: 'completed',
         durationSecs: raw.durationMs / 1000, fileName: 'benchmark-source.mp4', sourceLanguage: raw.detectedLanguage } : undefined,
+      ...(process.env.BENCHMARK_ENABLE_REWATCH === '1'
+        ? { reWatch: (await import('./quick-look-bridge.mjs')).benchmarkReWatch(input, raw, actions) }
+        : {}),
       planQuestion: planVideoQuestion,
       planInvestigation: planVideoInvestigation,
       search: searchVideoKnowledge,
@@ -119,6 +122,7 @@ export async function execute(input) {
         query: input.retrievalQuery ?? input.question.question, ...(input.investigation ? { investigation: input.investigation } : {}),
         limit: 48, ...(cursor !== undefined ? { cursor } : {}) }, context);
     }, { maxPages: input.protocol.maxEvidencePages ?? 64 });
+    if (actions.some((action) => action.action === 'canonicalReWatchFailed')) return { ...collected, success: false, toolExecutionValid: false, error: 'Canonical re-watch incomplete; reconcile saved requests before retry.', actions };
     return { ...collected, actions };
   });
 }

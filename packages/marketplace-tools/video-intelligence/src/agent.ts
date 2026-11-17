@@ -984,6 +984,17 @@ async function retrieve(
       minimumRangeDistanceSecs: 2,
     },
   );
+  const authoredModalities = (plan.modalities ?? []).filter(
+    (modality) => modality === 'transcript' || modality === 'ocr',
+  );
+  const sourceAuthored =
+    plan.kinds.includes('state-change') && authoredModalities.length > 0
+      ? await mediaEvidence.search(input.mediaAssetId, '', 2_000, {
+          ...options,
+          modalities: authoredModalities,
+          minimumRangeDistanceSecs: 0,
+        })
+      : [];
   const sourceTimeline =
     transitionTimeline && timeline.length < CORROBORATION_FLOOR
       ? await mediaEvidence.search(input.mediaAssetId, '', input.exhaustive ? 2_000 : 500, {
@@ -1000,8 +1011,9 @@ async function retrieve(
         ranked,
         subjectHits,
         sourceTimeline,
+        sourceAuthored,
       )
-    : mergeHits(ranked, visualHits, computedHits, subjectHits, sourceTimeline);
+    : mergeHits(ranked, visualHits, computedHits, subjectHits, sourceTimeline, sourceAuthored);
 }
 
 /**
@@ -1483,6 +1495,19 @@ function inventoryContext(text: string) {
 
 function temporalContextResult(hits: VideoKnowledgeSearchHit[], plan: VideoPlan) {
   if (!plan.kinds.includes('outcome') && !plan.kinds.includes('state-change')) return {};
+  const sourceReadings = plan.kinds.includes('state-change')
+    ? chronological(hits)
+        .filter((hit) => ['transcript', 'ocr'].includes(hit.evidence.modality))
+        .slice(0, 2_000)
+        .map((hit) => ({
+          id: hit.evidence.id,
+          modality: hit.evidence.modality,
+          atSecs: hit.evidence.timeRange.startSecs,
+          endSecs: hit.evidence.timeRange.endSecs,
+          text: evidenceText(hit.evidence.payload),
+        }))
+    : [];
+
   const readings = chronological(temporalSequenceHits(hits))
     .filter((hit) => {
       const text = evidenceText(hit.evidence.payload).trim();
@@ -1510,11 +1535,14 @@ function temporalContextResult(hits: VideoKnowledgeSearchHit[], plan: VideoPlan)
       atSecs: hit.evidence.timeRange.startSecs,
       text: evidenceText(hit.evidence.payload).slice(0, 700),
     }));
-  if (readings.length === 0) return {};
+  if (readings.length === 0 && sourceReadings.length === 0) return {};
   return {
     temporalContext: {
       readings,
+      sourceReadings,
+      sourceReadingsLimitReached: sourceReadings.length === 2_000,
       rule:
+        'Compare original sourceReadings with synthesized readings; a later summary must not erase an earlier introduction. A mentioned concept is not necessarily the requested event; identify the event meaning before ordering it. The source-reading retrieval cap does not prove exhaustive coverage. ' +
         'Read the timestamped states as a trajectory. Earlier and later counters can belong to ' +
         'different scopes: a reset or a change in labels, unit, or scale is a scope boundary. ' +
         'Resolve the ending state of the sequence relevant to the question from its changes and ' +

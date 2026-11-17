@@ -15,7 +15,7 @@ def read(path):return json.loads(Path(path).read_text())
 def implementation():
     repo=B.parents[3]
     paths=list((B.parent/'src').glob('*.ts'))+list((repo/'packages/core/src/video-knowledge').glob('*.ts'))+list(Path(__file__).parent.glob('*.py'))
-    paths += [B/'harness/tool-bridge.mjs',B/'harness/evidence-pages.mjs',B/'harness/answer_contract.py']
+    paths += [B/'harness/tool-bridge.mjs',B/'harness/evidence-pages.mjs',B/'harness/answer_contract.py', B/'harness/quick-look-bridge.mjs', B/'harness/paid-rewatch-cache.mjs', repo/'packages/workspace-server/src/lib/media/video/quick-look.ts']
     hashes={str(p.relative_to(repo)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(set(paths)) if p.is_file()}
     return {'git_revision':revision(),'source_tree_sha256':digest(hashes),'files':hashes}
 
