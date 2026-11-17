@@ -142,6 +142,7 @@ def run(args):
                     answerable=True)
                 row['explicit_abstention']=row['output_contract'].get('explicit_abstention') is True
                 row['invalid_output']=not row['output_contract']['valid']
+                row['new_reported_cost_usd']=0 if args.mode!='live' or row['cache_reused'] else row['usage'].get('cost')
                 if args.mode=='replay':
                     row['historical_correct']=case['archived_output'].get('correct')
                     if row['correct'] != row['historical_correct']:raise RuntimeError('Historical evaluation mismatch; no score migration allowed')
@@ -170,6 +171,8 @@ def run(args):
             planned=len(rows),completed=len(complete),integration_completed=sum(r['state']=='integration_completed' for r in rows),blocked=sum(r['state']=='blocked' for r in rows),
             accuracy=ratio(correct,len(complete)),accuracy_wilson_95=wilson(correct,len(complete)),
             categories=summary,abstention=abstention(rows),rows=rows,paid_calls_this_run=args.calls,
+            reported_new_cost_usd=sum(float(r.get('new_reported_cost_usd') or 0) for r in rows),
+            unknown_new_charge_count=max(0,args.calls-sum(args.mode=='live' and r.get('cache_reused') is False and r.get('new_reported_cost_usd') is not None for r in rows)),
             elapsed_seconds=time.monotonic()-start,gate={'status':gate,'target':args.target_accuracy,'min_samples':args.min_samples},
             missing_capability_annotations=['evidence relevance IDs','event instance order','source-wide fact inventory','live inspection completion/consumption trace'],
             research_limitations=['Development cases previously inspected during debugging; not held-out evidence.',
