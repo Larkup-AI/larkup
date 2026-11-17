@@ -1,5 +1,15 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.18
+
+### Patch Changes
+
+- 918491c: Preserve timestamped transcript and OCR evidence beside synthesized trajectories
+  for sequence investigations, so a later summary does not erase an earlier
+  source introduction. Report when the bounded source-reading cap is reached.
+  Allow isolated hosts to supply the existing canonical quick-look with a scoped
+  model and explicit retry limit, retaining the normal configured defaults.
+
 ## 0.3.17
 
 ### Patch Changes
