@@ -1,5 +1,15 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.16
+
+### Patch Changes
+
+- b5f3110: Guide video investigations to verify local visual details, event chronology,
+  negative claims and overall topic scope without inferring facts from summaries.
+  The isolated benchmark adapter also separates evidence pagination from paid
+  inspection budgets and constrains final answer output independently of agent
+  instructions. Historical benchmark scores remain unchanged.
+
 ## 0.3.15
 
 ### Patch Changes
