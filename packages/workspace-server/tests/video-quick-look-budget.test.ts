@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { MockLanguageModelV4 } from 'ai/test';
 import { runWithWorkspaceHost } from '../../core/src/workspace-host';
-import { quickLook } from '../src/lib/media/video/quick-look';
+import { quickLook, visualReasoningForCapabilities } from '../src/lib/media/video/quick-look';
 
 test('bounded visual reading limits generation and preserves observed facts', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'video-reading-budget-'));
@@ -23,10 +23,12 @@ test('bounded visual reading limits generation and preserves observed facts', as
       });
       queueMicrotask(async () => {
         try {
-          await writeFile(
-            args.at(-1)!.replace('%04d', '0001'),
-            Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
-          );
+          for (const number of ['0001', '0002', '0003']) {
+            await writeFile(
+              args.at(-1)!.replace('%04d', number),
+              Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+            );
+          }
           child.emit('close', 0);
         } catch (error) {
           child.emit('error', error);
@@ -38,7 +40,7 @@ test('bounded visual reading limits generation and preserves observed facts', as
     const model = new MockLanguageModelV4({
       doGenerate: async (options) => {
         assert.equal(options.reasoning, 'low');
-        assert.equal(options.maxOutputTokens, 2048);
+        assert.equal(options.maxOutputTokens, 4096);
         assert.ok(
           options.prompt.some(
             (m) =>
@@ -53,6 +55,25 @@ test('bounded visual reading limits generation and preserves observed facts', as
               type: 'text',
               text: JSON.stringify({
                 found: 'The panel is blue.',
+                states: [
+                  {
+                    atSecs: 0.5,
+                    subject: 'panel with square fastener',
+                    observation: 'A reflective surface.',
+                  },
+                  {
+                    atSecs: 0,
+                    subject: 'panel with round fastener',
+                    observation: 'A matte surface.',
+                  },
+                  {
+                    atSecs: 0.25,
+                    subject: 'panel with round fastener',
+                    observation: 'A striped insert.',
+                  },
+                  { atSecs: 99, subject: 'outside window', observation: 'Must be excluded.' },
+                  { atSecs: 0.4, subject: 'not a sampled frame', observation: 'Must be excluded.' },
+                ],
                 settlesQuestion: true,
                 read: [],
                 confidence: 'high',
@@ -87,9 +108,33 @@ test('bounded visual reading limits generation and preserves observed facts', as
     assert.equal(findings[0].found, 'The panel is blue.');
     assert.equal(findings[0].settlesQuestion, true);
     assert.ok(findings[0].frameCount > 0);
+    const states = (findings[0] as any).states;
+    assert.deepEqual(
+      states.map((state: any) => state.atSecs),
+      [0, 0.25, 0.5],
+    );
+    assert.equal(states[0].subject, 'panel with round fastener');
+    assert.equal(states[2].subject, 'panel with square fastener');
+    assert.equal(states[2].observation, 'A reflective surface.');
   } finally {
     mock.restoreAll();
     syncBuiltinESMExports();
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('observation reasoning follows advertised capabilities rather than model names', () => {
+  assert.equal(
+    visualReasoningForCapabilities([{ type: 'toggle' }, { type: 'budget_tokens' }]),
+    'none',
+  );
+  assert.equal(
+    visualReasoningForCapabilities([{ type: 'effort', values: ['medium', 'minimal', 'high'] }]),
+    'minimal',
+  );
+  assert.equal(
+    visualReasoningForCapabilities([{ type: 'effort', values: ['high', 'low'] }]),
+    'low',
+  );
+  assert.equal(visualReasoningForCapabilities(undefined), 'low');
 });

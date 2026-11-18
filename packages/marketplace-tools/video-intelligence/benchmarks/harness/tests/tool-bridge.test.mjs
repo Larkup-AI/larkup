@@ -61,8 +61,11 @@ test('bounded runtime inspection receives the question as a question, not only a
     const result = await execute(input);
     assert.equal(submitted.source.durationSecs, 2);
     assert.equal(submitted.source.timelineDurationSecs, 10);
-    assert.deepEqual(submitted.brief.expectedQuestions, [question]);
-    assert.equal(submitted.brief.goal, question);
+    assert.equal(submitted.brief.expectedQuestions.length, 1);
+    assert.ok(submitted.brief.expectedQuestions[0].startsWith(question));
+    assert.ok(submitted.brief.expectedQuestions[0].includes('A. spiral'));
+    assert.ok(submitted.brief.expectedQuestions[0].includes('B. square'));
+    assert.equal(submitted.brief.goal, submitted.brief.expectedQuestions[0]);
     assert.equal(result.pages[0].claimVerification.directlyEstablished, true);
     submitted = undefined;
     const readback = await execute({ ...input, reconcileOnly: true });

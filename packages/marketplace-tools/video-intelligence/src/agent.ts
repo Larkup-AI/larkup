@@ -42,6 +42,8 @@ interface InspectVideoKnowledgeInput {
 interface QueryVideoEvidenceInput {
   mediaAssetId: string;
   query: string;
+  /** User-supplied alternatives; no expected/correct option is accepted. */
+  answerOptions?: string[];
   /**
    * Optional semantic instruction produced by the chat model. The evidence
    * action still has a safe focused retrieval path when a weak model cannot
@@ -77,6 +79,13 @@ export const AGENT_TOOLS = [
       properties: {
         mediaAssetId: { type: 'string', minLength: 1 },
         query: { type: 'string', minLength: 1, maxLength: 2_000 },
+        answerOptions: {
+          type: 'array',
+          maxItems: 10,
+          items: { type: 'string', minLength: 1, maxLength: 500 },
+          description:
+            'Preserve any alternatives supplied with the question so direct readers can compare the actual candidates. Do not include an expected answer.',
+        },
         investigation: {
           type: 'object',
           additionalProperties: false,
@@ -194,7 +203,8 @@ export function attachVideoIntelligenceAgentClient(
           input.exhaustive ??
           (plan.requiresBroadCoverage === true &&
             directive.goal !== 'resolve' &&
-            directive.goal !== 'compare'),
+            directive.goal !== 'compare' &&
+            input.investigation?.goal !== 'synthesize'),
       };
       const durationSecs = asset.durationSecs;
       // The compact aggregate is revision-cached and carries protocol-backed
@@ -430,7 +440,7 @@ export function attachVideoIntelligenceAgentClient(
           const readings = await mediaEvidence
             .reWatch(
               input.mediaAssetId,
-              focusedInput.query,
+              observationQuestion(focusedInput),
               // The host reads these windows together, so a fourth costs
               // little wall time and a progression usually needs more than two.
               targets.slice(0, 4).map((range) => ({
@@ -1025,35 +1035,90 @@ async function retrieve(
     crossEvidence ||
     plan.modalities?.includes('visual') ||
     plan.kinds.some((kind) => ['visual-fact', 'person-attribute'].includes(kind));
-  const [ranked, subjectHits, identityHits, visualHits, computedHits] = await Promise.all([
-    mediaEvidence.search(input.mediaAssetId, input.query, 16, options),
-    plan.subjectName
-      ? mediaEvidence.search(input.mediaAssetId, plan.subjectName, 12, options)
-      : Promise.resolve([]),
-    plan.requiresIdentityContext
-      ? mediaEvidence.search(
-          input.mediaAssetId,
-          'participant names roster lineup name labels captions speaker identities',
-          8,
-          options,
-        )
-      : Promise.resolve([]),
-    needsVisualSource
-      ? mediaEvidence.search(input.mediaAssetId, input.query, 16, {
-          ...options,
-          modalities: ['visual'],
-        })
-      : Promise.resolve([]),
-    crossEvidence
-      ? mediaEvidence.search(input.mediaAssetId, input.query, 16, {
-          ...options,
-          modalities: ['computed'],
-        })
-      : Promise.resolve([]),
-  ]);
+  const [ranked, subjectHits, identityHits, visualHits, computedHits, alternatives] =
+    await Promise.all([
+      mediaEvidence.search(input.mediaAssetId, input.query, 16, options),
+      plan.subjectName
+        ? mediaEvidence.search(input.mediaAssetId, plan.subjectName, 12, options)
+        : Promise.resolve([]),
+      plan.requiresIdentityContext
+        ? mediaEvidence.search(
+            input.mediaAssetId,
+            'participant names roster lineup name labels captions speaker identities',
+            8,
+            options,
+          )
+        : Promise.resolve([]),
+      needsVisualSource
+        ? mediaEvidence.search(input.mediaAssetId, input.query, 16, {
+            ...options,
+            modalities: ['visual'],
+          })
+        : Promise.resolve([]),
+      crossEvidence
+        ? mediaEvidence.search(input.mediaAssetId, input.query, 16, {
+            ...options,
+            modalities: ['computed'],
+          })
+        : Promise.resolve([]),
+      Promise.all(
+        (input.answerOptions ?? []).map((option) =>
+          mediaEvidence.search(
+            input.mediaAssetId,
+            option,
+            Math.max(1, Math.floor(12 / (input.answerOptions?.length || 1))),
+            options,
+          ),
+        ),
+      ),
+    ]);
+  // Give every supplied alternative the same bounded source lookup. Search
+  // similarity locates possible support; the evidence contract still verifies it.
+  const alternativeHits = alternatives.flat();
+  const priority = alternativeHits.length > 0 ? ranked.slice(0, 8) : ranked;
   if (!needsSourceWideView(plan)) {
-    return mergeHits(ranked, visualHits, computedHits, subjectHits, identityHits);
+    return mergeHits(
+      priority,
+      alternativeHits,
+      visualHits,
+      computedHits,
+      ranked,
+      subjectHits,
+      identityHits,
+    );
   }
+  if (
+    plan.investigation?.goal === 'synthesize' &&
+    !input.exhaustive &&
+    durationSecs &&
+    durationSecs > 0
+  ) {
+    const primary = (plan.modalities ?? []).filter((modality) => modality !== 'computed');
+    const groups = await Promise.all(
+      Array.from({ length: 8 }, (_, index) =>
+        mediaEvidence.search(input.mediaAssetId, '', 8, {
+          ...options,
+          ...(primary.length ? { modalities: primary } : {}),
+          timeRange: {
+            startSecs: (durationSecs * index) / 8,
+            endSecs: (durationSecs * (index + 1)) / 8,
+          },
+          minimumRangeDistanceSecs: 2,
+        }),
+      ),
+    );
+    const samples = groups.flat().filter((hit) => !spansWholeSource(hit, durationSecs));
+    return mergeHits(
+      priority,
+      alternativeHits,
+      samples,
+      visualHits,
+      computedHits,
+      ranked,
+      subjectHits,
+    );
+  }
+
   // A question about breadth or order cannot be served by the top matches
   // alone: the relevant moment may share no words with the question. Scanning
   // the immutable observations stays local and avoids a blind analysis pass.
@@ -1097,6 +1162,7 @@ async function retrieve(
   return plan.requiresIdentityContext
     ? mergeHits(
         ranked.slice(0, 3),
+        alternativeHits,
         identityHits.slice(0, 3),
         visualHits,
         computedHits,
@@ -1105,7 +1171,16 @@ async function retrieve(
         sourceTimeline,
         sourceAuthored,
       )
-    : mergeHits(ranked, visualHits, computedHits, subjectHits, sourceTimeline, sourceAuthored);
+    : mergeHits(
+        priority,
+        alternativeHits,
+        visualHits,
+        computedHits,
+        ranked,
+        subjectHits,
+        sourceTimeline,
+        sourceAuthored,
+      );
 }
 
 /**
@@ -2321,7 +2396,7 @@ async function inspectRanges(options: {
         endSecs: range.endSecs,
         purpose: inspectionPurpose(plan.kinds),
         queryId: stableQueryId(input.query),
-        question: input.query,
+        question: observationQuestion(input),
         maxFrames: plan.kinds.includes('state-change')
           ? 24
           : plan.kinds.includes('person-attribute') || plan.requiresIdentityContext
@@ -2476,18 +2551,14 @@ function selectAnswerEvidence(
       const cursor = Math.min(Math.max(0, input.cursor ?? 0), ordered.length);
       return ordered.slice(cursor, cursor + limit);
     }
-    return chronological(assessment.established).length <= limit
-      ? chronological(assessment.established)
-      : mergeHits(
-          chronological(assessment.established).filter((hit) =>
-            /Claim verdict:\s*direct/i.test(evidenceText(hit.evidence.payload)),
-          ),
-          evenlySpaced(chronological(assessment.established), limit),
-        )
-          .sort(
-            (left, right) => left.evidence.timeRange.startSecs - right.evidence.timeRange.startSecs,
-          )
-          .slice(0, limit);
+    const ordered = chronological(assessment.established);
+    if (ordered.length <= limit) return ordered;
+    // Early direct claims must not crowd the closing source out of a synopsis.
+    const direct = evenlySpaced(
+      ordered.filter((hit) => /Claim verdict:\s*direct/i.test(evidenceText(hit.evidence.payload))),
+      Math.floor(limit / 3),
+    );
+    return chronological(mergeHits(direct, evenlySpaced(ordered, limit - direct.length)));
   }
   const limit = Math.min(
     input.limit ?? (plan.requiresBothRanges || isCrossEvidenceClaim(plan) ? 12 : 8),
@@ -3320,12 +3391,32 @@ function focusQuestion(question: string, fileName?: string) {
   return focused || normalized;
 }
 
+function observationQuestion(input: QueryVideoEvidenceInput): string {
+  if (!input.answerOptions?.length) return input.query;
+  return (
+    input.query +
+    '\nAnswer alternatives supplied with the question:\n' +
+    input.answerOptions
+      .map((option, index) =>
+        /^[A-Z][.)]\s/.test(option) ? option : `${String.fromCharCode(65 + index)}. ${option}`,
+      )
+      .join('\n')
+  );
+}
+
 function isValidQueryInput(input: QueryVideoEvidenceInput): boolean {
   return (
     typeof input.mediaAssetId === 'string' &&
     input.mediaAssetId.length > 0 &&
     typeof input.query === 'string' &&
-    input.query.trim().length > 0
+    input.query.trim().length > 0 &&
+    (input.answerOptions === undefined ||
+      (Array.isArray(input.answerOptions) &&
+        input.answerOptions.length <= 10 &&
+        input.answerOptions.every(
+          (option) =>
+            typeof option === 'string' && option.trim().length > 0 && option.length <= 500,
+        )))
   );
 }
 

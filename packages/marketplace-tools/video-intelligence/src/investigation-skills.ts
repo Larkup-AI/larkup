@@ -36,6 +36,11 @@ export const VIDEO_INVESTIGATION_SKILLS = [
       'Answer in the returned sourceLanguage by default, including notes, speech, and lyrics; translate only when the user explicitly asks. Never default to English.',
   },
   {
+    id: 'answer-alternatives',
+    instruction:
+      'When the user supplies answer alternatives, preserve them in answerOptions for source verification. Compare every condition against the source. If several alternatives remain supported, give the best-supported answer with an explicit ambiguity note; never claim uniqueness or invent support for an alternative.',
+  },
+  {
     id: 'verify-claims',
     instruction:
       'Never say you do not know or that the source lacks an answer before this action has attempted its available fallback. State a value, identity, count, or exact visible fact only when established.',

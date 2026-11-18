@@ -141,7 +141,7 @@ export async function execute(input) {
     const collected = await collectEvidencePages(async (cursor) => {
       actions.push({ action: 'queryVideoEvidence', cursor: cursor ?? 0 });
       return client.queryVideoEvidence({ mediaAssetId: input.sourceId,
-        query: input.question.question, ...(input.investigation ? { investigation: input.investigation } : {}),
+        query: input.question.question, answerOptions: input.question.options, ...(input.investigation ? { investigation: input.investigation } : {}),
         limit: 48, ...(cursor !== undefined ? { cursor } : {}) }, context);
     }, { maxPages: input.protocol.maxEvidencePages ?? 64 });
     if (actions.some((action) => action.action === 'canonicalReWatchFailed' && action.outcomeRequiresReconciliation)) return { ...collected, success: false, toolExecutionValid: false, error: 'Canonical re-watch incomplete; reconcile saved requests before retry.', actions };

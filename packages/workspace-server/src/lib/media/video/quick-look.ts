@@ -46,11 +46,46 @@ export interface QuickLookRange {
   lookingFor?: string;
 }
 
+type VisualReasoning = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+/** Reserve reasoning for synthesis; use the least supported effort for observation. */
+export function visualReasoningForCapabilities(value: unknown): VisualReasoning {
+  if (!Array.isArray(value)) return 'low';
+  if (value.some((option) => option?.type === 'toggle')) return 'none';
+  const efforts = value.flatMap((option) =>
+    option?.type === 'effort' && Array.isArray(option.values) ? option.values : [],
+  );
+  return (
+    (['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const).find((effort) =>
+      efforts.includes(effort),
+    ) ?? 'low'
+  );
+}
+
+async function visualReasoning(
+  model: ReturnType<typeof createChatModel>,
+): Promise<VisualReasoning> {
+  if (!model.provider.startsWith('gateway')) return 'low';
+  const catalog = await getModelsByType('language');
+  const descriptor = catalog.find((entry) => entry.id === model.modelId) as
+    { reasoning_options?: unknown } | undefined;
+  return visualReasoningForCapabilities(descriptor?.reasoning_options);
+}
+
+export interface QuickLookState {
+  atSecs: number;
+  subject: string;
+  observation: string;
+}
+
 export interface QuickLookFinding {
   range: { startSecs: number; endSecs: number };
   at: string;
   /** What the re-watch established, in the reader's own words. */
   found: string;
+  /** Distinct appearances on the supplied frame clock, without merging their subjects. */
+  states?: QuickLookState[];
+  reasoning?: VisualReasoning;
   /** Whether this bounded reading actually answers the question, not merely relates to it. */
   settlesQuestion: boolean;
   /** For requests about every visible subject, whether each one was individually covered. */
@@ -145,6 +180,7 @@ export function parseFinding(raw: string): {
   confidence?: unknown;
   settlesQuestion?: unknown;
   coverageComplete?: unknown;
+  states?: unknown;
 } {
   const text = raw
     .trim()
@@ -172,6 +208,39 @@ export function parseFinding(raw: string): {
   }
 }
 
+function observedStates(
+  value: unknown,
+  frames: Array<{ timestampSecs: number }>,
+): QuickLookState[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value
+    .flatMap((state): QuickLookState[] => {
+      if (
+        !state ||
+        typeof state !== 'object' ||
+        !Number.isFinite(state.atSecs) ||
+        !frames.some((frame) => Math.abs(frame.timestampSecs - state.atSecs) < 0.002) ||
+        typeof state.subject !== 'string' ||
+        !state.subject.trim() ||
+        typeof state.observation !== 'string' ||
+        !state.observation.trim()
+      )
+        return [];
+      const record = {
+        atSecs: state.atSecs,
+        subject: state.subject.trim().slice(0, 200),
+        observation: state.observation.trim().slice(0, 600),
+      };
+      const key = JSON.stringify(record);
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [record];
+    })
+    .sort((a, b) => a.atSecs - b.atSecs)
+    .slice(0, 8);
+}
+
 async function lookAtRange(input: {
   mediaPath: string;
   range: QuickLookRange;
@@ -179,6 +248,7 @@ async function lookAtRange(input: {
   transcript?: string;
   model: ReturnType<typeof createChatModel>;
   maxRetries?: number;
+  reasoning: VisualReasoning;
   signal?: AbortSignal;
 }): Promise<QuickLookFinding> {
   const startedAt = Date.now();
@@ -204,7 +274,10 @@ async function lookAtRange(input: {
     }
     const content: Array<Record<string, unknown>> = [];
     for (const frame of frames) {
-      content.push({ type: 'text', text: `@${timecode(frame.timestampSecs)}` });
+      content.push({
+        type: 'text',
+        text: `@${timecode(frame.timestampSecs)} (${frame.timestampSecs.toFixed(3)} source seconds)`,
+      });
       content.push({
         type: 'file',
         mediaType: 'image/jpeg',
@@ -221,6 +294,11 @@ async function lookAtRange(input: {
           ? `What is said during this stretch: ${input.transcript.slice(0, 4_000)}`
           : '',
         '',
+        'Record each distinct relevant appearance in states, using its exact supplied frame time as atSecs.',
+        'Describe stable visible subject qualifiers and nearby people or labels that distinguish similar appearances.',
+        'Do not stop at the first plausible change: preserve the other relevant states in chronological order.',
+        'Only the property being compared may change without rechecking the other subject qualifiers.',
+        'Never merge attributes from different people or settings. Keep ambiguous matches separate.',
         'Read every informative piece of on-screen text exactly, including anything that appears',
         'only briefly, and say what each is attached to. On-screen text and speech are legitimate',
         'ways to identify people and things -- use them, and say what established an identity.',
@@ -248,6 +326,8 @@ async function lookAtRange(input: {
         '{"settlesQuestion":true|false,"coverageComplete":true|false,',
         '"found":"what you established, 1-3 sentences",',
         '"confidence":"high|medium|low",',
+        '"states":[{"atSecs":0,"subject":"visible subject qualifiers","observation":"visible properties and surrounding context"}],',
+        'Use up to eight distinct relevant states. Only use source seconds printed beside the supplied frames.',
         '"read":["up to 5 exact short quotes of text you actually read on screen"]}',
       ]
         .filter(Boolean)
@@ -257,8 +337,8 @@ async function lookAtRange(input: {
     const { text, usage } = await generateText({
       model: input.model as Parameters<typeof generateText>[0]['model'],
       // This pass reports bounded observations; synthesis belongs to the answer model.
-      maxOutputTokens: 2048,
-      reasoning: 'low',
+      maxOutputTokens: 4096,
+      reasoning: input.reasoning,
       maxRetries: input.maxRetries ?? 2,
       abortSignal: input.signal,
       messages: [{ role: 'user', content: content as never }],
@@ -278,6 +358,8 @@ async function lookAtRange(input: {
     return {
       ...base,
       found: typeof parsed.found === 'string' ? parsed.found : '',
+      states: observedStates(parsed.states, frames),
+      reasoning: input.reasoning,
       settlesQuestion: parsed.settlesQuestion === true,
       coverageComplete:
         typeof parsed.coverageComplete === 'boolean' ? parsed.coverageComplete : undefined,
@@ -333,6 +415,7 @@ export async function quickLook(input: {
       config.customVisionModels,
     );
   }
+  const reasoning = await visualReasoning(model);
   return Promise.all(
     ranges.map((range) =>
       lookAtRange({
@@ -342,6 +425,7 @@ export async function quickLook(input: {
         transcript: input.transcriptFor?.(range),
         model,
         maxRetries: input.maxRetries,
+        reasoning,
         signal: input.signal,
       }),
     ),
