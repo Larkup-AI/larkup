@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.72
+
+### Patch Changes
+
+- 65a96b4: Preserve supplied answer alternatives through retrieval and inspection, retain distinct visual states on validated source-frame timestamps, and use supported observation reasoning budgets. Bound explicit whole-source synthesis to distributed primary excerpts while preserving complete inventories and closing context; disclose supported answer ambiguity without inventing certainty.
+
 ## 0.2.71
 
 ### Patch Changes
