@@ -1,5 +1,9 @@
 import Dashboard from '../components/Dashboard.js';
-
+import RecoveryDashboard from '../components/RecoveryDashboard.js';
 export default function Page() {
-  return <Dashboard />;
+  return (
+    <RecoveryDashboard>
+      <Dashboard />
+    </RecoveryDashboard>
+  );
 }
