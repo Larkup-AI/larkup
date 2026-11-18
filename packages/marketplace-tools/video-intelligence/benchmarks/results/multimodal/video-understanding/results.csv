@@ -1,6 +1,6 @@
 reader,question_id,source_id,baseline_run_id,baseline_correct,baseline_option,official_option,retested,new_correct,new_option,cumulative_correct,answer_origin,new_brain,latency_s,completed_attempts,execution_mode,final_reasoning_effort,rewatch_timeout_ms,new_answer,reported_final_usage,actual_cash_cost_usd
 latest,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-79f3b55b0359ec26d60c,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
-latest,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,E,B,True,False,E,False,new failed-question retry,deepseek-v4-pro,19.88,1,api-rewatch,high,interactive-default,"{
+latest,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,E,B,True,False,E,False,completed failed-question retry,deepseek-v4-pro,19.88,1,api-rewatch,high,interactive-default,"{
   ""option"": ""E"",
   ""explanation"": ""At 34:01–34:37, the rewatch evidence shows the man appearing beside 'THE WALL STREET JOURNAL' putting on dark sunglasses, so the change is an additional pair of sunglasses on his face."",
   ""evidence"": [
@@ -12,25 +12,19 @@ latest,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-79f3b55b0359e
     }
   ]
 }","{""completion_tokens"": 949, ""completion_tokens_details"": {""reasoning_tokens"": 819}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 7334, ""prompt_tokens"": 7590, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 8539}",
-latest,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,E,True,False,,False,new failed-question retry; abstained; authorized visual follow-up unscored,deepseek-v4-pro,62.52,1,api-rewatch,high,120000,"{
-  ""option"": null,
-  ""explanation"": ""The supplied evidence includes the \""WHERE IS KATE?\"" segment and a Kate Middleton sighting, but none of it describes the woman's coat changing color or her appearing next to a man in a black suit. Visual attribution is withheld, so the requested change cannot be established from the source."",
+latest,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,E,True,False,D,False,completed failed-question retry,deepseek-v4-pro,45.97,3,api-rewatch,high,120000,"{
+  ""option"": ""D"",
+  ""explanation"": ""The rewatch at 25:58–26:19 shows that when the woman (the Princess of Wales) appears next to a man in a black suit, her attire changes from the dark coat to a dark green coat over a cream top."",
   ""evidence"": [
     {
-      ""startMs"": 1399098,
-      ""endMs"": 1409008,
-      ""kind"": ""computed"",
-      ""claim"": ""Reconciled event: Segment teases royal coverage with 'WHERE IS KATE?'""
-    },
-    {
-      ""startMs"": 1416649,
-      ""endMs"": 1425357,
-      ""kind"": ""computed"",
-      ""claim"": ""Reconciled visible subject: Kate Middleton""
+      ""startMs"": 1558000,
+      ""endMs"": 1579000,
+      ""kind"": ""visual"",
+      ""claim"": ""When the Princess of Wales appears next to a man wearing a black suit and glasses, her attire changes from the dark coat to a dark green coat over a cream top, and the on-screen quote graphic from Kensington Palace disappears.""
     }
   ]
-}","{""completion_tokens"": 1491, ""completion_tokens_details"": {""reasoning_tokens"": 1307}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 37392, ""prompt_tokens"": 37776, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 39267}",
-latest,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,D,True,True,D,True,new failed-question retry,deepseek-v4-pro,30.18,3,api-rewatch,high,interactive-default,"{
+}","{""completion_tokens"": 1853, ""completion_tokens_details"": {""reasoning_tokens"": 1698}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 22915, ""prompt_tokens"": 22915, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 24768}",
+latest,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,D,True,True,D,True,retained recovered pass,deepseek-v4-pro,30.18,3,api-rewatch,high,interactive-default,"{
   ""option"": ""D"",
   ""explanation"": ""The rewatch observation at 41:42 shows that when the screen text changes to 'GLOBAL WATCH', the anchor's right hand is raised off the desk and holding a white paper, so the change is to holding a piece of paper with his right hand."",
   ""evidence"": [
@@ -42,7 +36,7 @@ latest,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-79f3b55b0359e
     }
   ]
 }","{""completion_tokens"": 1359, ""completion_tokens_details"": {""reasoning_tokens"": 1208}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 7456, ""prompt_tokens"": 7968, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 9327}",
-latest,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359ec26d60c,False,A,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,9.95,2,api-rewatch,,interactive-default,"{
+latest,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359ec26d60c,False,A,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,9.95,2,api-rewatch,,interactive-default,"{
   ""option"": ""C"",
   ""explanation"": ""The source is a black-and-white photograph of Ostad Elahi playing a tanbur. The tie appears dark/black in grayscale, but the original hue cannot be recovered from monochrome. Among the options, 'black' is the closest match to the observed dark appearance."",
   ""evidence"": [
@@ -54,7 +48,7 @@ latest,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359e
     }
   ]
 }","{""completion_tokens"": 154, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 6563, ""prompt_tokens"": 6819, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 6973}",
-latest,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359ec26d60c,False,E,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,14.53,1,api-rewatch,,interactive-default,"{
+latest,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359ec26d60c,False,E,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,14.53,1,api-rewatch,,interactive-default,"{
   ""option"": ""C"",
   ""explanation"": ""The man with glasses holding a musical instrument is observed wearing white gloves in the source video at 1:40–1:50 (100.976–110.36 seconds)."",
   ""evidence"": [
@@ -67,7 +61,7 @@ latest,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359e
   ]
 }","{""completion_tokens"": 106, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 7119, ""prompt_tokens"": 7119, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 7225}",
 latest,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-79f3b55b0359ec26d60c,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
-latest,video-mme-428-1,video-mme-20gUIdXGuAs,run-79f3b55b0359ec26d60c,False,,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,13.05,1,api-rewatch,,interactive-default,"{
+latest,video-mme-428-1,video-mme-20gUIdXGuAs,run-79f3b55b0359ec26d60c,False,,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,13.05,1,api-rewatch,,interactive-default,"{
   ""option"": ""A"",
   ""explanation"": ""The video reports that Google was fined by the French competition watchdog for failing to negotiate fair licensing deals with news media outlets and for not disclosing that it was using their articles to train its AI chatbot. This corresponds to being sued for unlawfully using copyrighted content to train AI models."",
   ""evidence"": [
@@ -84,7 +78,7 @@ latest,video-mme-428-3,video-mme-20gUIdXGuAs,run-79f3b55b0359ec26d60c,True,C,C,F
 latest,video-mme-156-1,video-mme-BkiTScinYOQ,run-79f3b55b0359ec26d60c,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 latest,video-mme-156-2,video-mme-BkiTScinYOQ,run-79f3b55b0359ec26d60c,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
 latest,video-mme-156-3,video-mme-BkiTScinYOQ,run-79f3b55b0359ec26d60c,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-latest,video-mme-010-1,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,False,B,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,11.66,1,api-rewatch,high,interactive-default,"{
+latest,video-mme-010-1,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,False,B,C,True,False,B,False,completed failed-question retry,deepseek-v4-pro,11.66,1,api-rewatch,high,interactive-default,"{
   ""option"": ""B"",
   ""explanation"": ""The video is an animated cardboard-cutout presentation about intercultural communication. It opens by noting world diversity, explains how cultural perspective influences perception, raises questions about speaking across cultures and workplace cultural differences, introduces a 'Diversity Dashboard' of cultural dimensions, and closes by promoting Dr. Deborah Swallow as a leading authority on intercultural communication. This aligns with learning the fundamentals of intercultural communication, not conflict history, language mastery, or political resolution."",
   ""evidence"": [
@@ -139,9 +133,32 @@ latest,video-mme-010-1,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,False,B,C,
   ]
 }","{""completion_tokens"": 1400, ""completion_tokens_details"": {""reasoning_tokens"": 792}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 31439, ""prompt_tokens"": 31695, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 33095}",
 latest,video-mme-010-2,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
-latest,video-mme-010-3,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,False,A,B,False,,,False,unresolved baseline failure,,,0,,,,,,
+latest,video-mme-010-3,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,False,A,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,175.65,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The evidence shows the plane traveling over the Eiffel Tower and a double-decker bus (London) at 0:00–1:55, and over Taj Mahal and Petronas Towers at 1:02–1:28. However, it does not identify which of the listed alternatives is not visited; the direct reading states the place cannot be definitively determined. Therefore no option can be selected."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 115000,
+      ""kind"": ""directObservation"",
+      ""claim"": ""The animation shows the pilot flying over a double-decker bus (representing London/the UK) and the Eiffel Tower (representing Paris/France), but without the specific list of multiple-choice options being asked about, the place he does not travel to cannot be definitively determined.""
+    },
+    {
+      ""startMs"": 61920,
+      ""endMs"": 88480,
+      ""kind"": ""reconciledEvent"",
+      ""claim"": ""Airplane flying over landscapes and landmarks including Taj Mahal and Petronas Towers""
+    },
+    {
+      ""startMs"": 79600,
+      ""endMs"": 88480,
+      ""kind"": ""reconciledEvent"",
+      ""claim"": ""Airplane flies past world landmark drawings including Taj Mahal and Petronas Towers""
+    }
+  ]
+}","{""completion_tokens"": 7207, ""completion_tokens_details"": {""reasoning_tokens"": 6898}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 10698, ""prompt_tokens"": 11082, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 18289}",
 latest,video-mme-623-1,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
-latest,video-mme-623-2,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,False,C,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,26.38,2,api-rewatch,high,interactive-default,"{
+latest,video-mme-623-2,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,False,C,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,26.38,2,api-rewatch,high,interactive-default,"{
   ""option"": ""A"",
   ""explanation"": ""The earliest supported timestamps are: Personal Fat Threshold heading at ~582.8s; the question 'What makes the fat cell grow?' at ~882.4s; and the contrast between low-calorie and low-insulin diets at ~2036.2s. Therefore the order is ①, ②, ③."",
   ""evidence"": [
@@ -167,15 +184,43 @@ latest,video-mme-623-2,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,False,C,A,
 }","{""completion_tokens"": 2519, ""completion_tokens_details"": {""reasoning_tokens"": 2266}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 57857, ""prompt_tokens"": 57857, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 60376}",
 latest,video-mme-623-3,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
-qwen,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,False,,,False,unresolved baseline failure,,,0,,,,,,
-qwen,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,False,,,False,unresolved baseline failure,,,0,,,,,,
+qwen,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,174.32,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The only evidence related to 'THE WALL STREET JOURNAL' is a WSJ headline 'Old Leaders Run the World' displayed with a Biden photo at approximately 2041.9–2056.9s. The evidence does not describe any change to the man, such as additional glasses, a hat, sunglasses, or hair color change, so none of the options can be established."",
+  ""evidence"": [
+    {
+      ""startMs"": 2041873,
+      ""endMs"": 2056873,
+      ""kind"": ""computed"",
+      ""claim"": ""WSJ headline 'Old Leaders Run the World' displayed with Biden photo.""
+    }
+  ]
+}","{""completion_tokens"": 3417, ""completion_tokens_details"": {""reasoning_tokens"": 3263}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 10346, ""prompt_tokens"": 10730, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 14147}",
+qwen,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,110.32,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The supplied evidence does not establish the woman's identity or any coat change. The targeted rewatch at 25:58–26:22 (1558–1582) reported visual attribution withheld, and the later B-roll note at ~1590.5s only describes a couple walking, without identifying a coat color change. Therefore no option can be selected."",
+  ""evidence"": [
+    {
+      ""startMs"": 1558000,
+      ""endMs"": 1582000,
+      ""kind"": ""direct-observation"",
+      ""claim"": ""Rewatch of 1558–1582 reported visual attribution withheld; no actor identity or action established.""
+    },
+    {
+      ""startMs"": 1580512,
+      ""endMs"": 1592624,
+      ""kind"": ""visual"",
+      ""claim"": ""Visual reading at ~1590.5 does not describe any coat color change; only a well-dressed couple walking near a grey car.""
+    }
+  ]
+}","{""completion_tokens"": 3862, ""completion_tokens_details"": {""reasoning_tokens"": 3643}, ""prompt_cache_hit_tokens"": 640, ""prompt_cache_miss_tokens"": 11765, ""prompt_tokens"": 12405, ""prompt_tokens_details"": {""cached_tokens"": 640}, ""total_tokens"": 16267}",
 qwen,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-9d45724237e86021e098,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,video-mme-428-1,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,video-mme-428-2,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-qwen,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,70.83,1,api-rewatch,high,120000,"{
+qwen,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,70.83,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""The video shows gameplay footage of an AI-driven NPC (Bloom) in a Ubisoft prototype. The presenter describes it as an AI experiment, and the character is stated to be AI-powered, not scripted, responding in real-time. Therefore the game content is generated by AI."",
   ""evidence"": [
@@ -196,7 +241,7 @@ qwen,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,Tru
 qwen,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-qwen,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,13.5,1,api-rewatch,high,120000,"{
+qwen,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,completed failed-question retry,deepseek-v4-pro,13.5,1,api-rewatch,high,120000,"{
   ""option"": ""B"",
   ""explanation"": ""The video uses animated scenarios to illustrate how cultural perspective shapes perception, depicts cross-cultural miscommunication and workplace cultural dimensions, and ends with Dr. Deborah Swallow, identified as a leading authority on intercultural communication. Its focus is fundamentals of intercultural communication, not history, language acquisition, or political conflict."",
   ""evidence"": [
@@ -220,8 +265,25 @@ qwen,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,Tru
     }
   ]
 }","{""completion_tokens"": 945, ""completion_tokens_details"": {""reasoning_tokens"": 656}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 44212, ""prompt_tokens"": 44596, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 45541}",
-qwen,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,False,,,False,unresolved baseline failure,,,0,,,,,,
-qwen,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,,False,new failed-question retry,deepseek-v4-pro,41.8,1,api-rewatch,high,120000,"{
+qwen,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,75.59,1,api-rewatch,high,120000,"{
+  ""option"": ""A"",
+  ""explanation"": ""The casually dressed staff member at the left AB AIRLINE counter who waves is identified as wearing a floral shirt, matching 'A flower'."",
+  ""evidence"": [
+    {
+      ""startMs"": 33020,
+      ""endMs"": 42900,
+      ""kind"": ""visual"",
+      ""claim"": ""At the left-hand airline counter under the 'AB AIRLINE' sign, the two staff behave informally. They wear Hawaiian-style shirts: the left one patterned with palm trees, the right one with flowers.""
+    },
+    {
+      ""startMs"": 34520,
+      ""endMs"": 35000,
+      ""kind"": ""visual"",
+      ""claim"": ""The casual staff member with the floral shirt at the left podium raises his hand and waves, the informal behavior singled out in the question.""
+    }
+  ]
+}","{""completion_tokens"": 1906, ""completion_tokens_details"": {""reasoning_tokens"": 1719}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 10687, ""prompt_tokens"": 11071, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 12977}",
+qwen,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,41.8,1,api-rewatch,high,120000,"{
   ""option"": null,
   ""explanation"": ""The supplied evidence only mentions the pilot flying over the Taj Mahal and Petronas-style twin towers near the end (65-88s). It does not mention the White House, Big Ben, the Egyptian Pyramids, or the Eiffel Tower, so it cannot establish which of the listed places the copilot does not travel to."",
   ""evidence"": [
@@ -233,7 +295,7 @@ qwen,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,Tr
     }
   ]
 }","{""completion_tokens"": 2996, ""completion_tokens_details"": {""reasoning_tokens"": 2827}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 43475, ""prompt_tokens"": 43859, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 46855}",
-qwen,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,54.92,1,api-rewatch,high,120000,"{
+qwen,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,54.92,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""The presentation consistently focuses on how body fat, especially fat-cell hypertrophy, causes insulin resistance, and how insulin resistance is linked to chronic diseases such as obesity and diabetes. Early slides show Insulin Resistance as a central hub connected to Diabetes, Heart Disease, Cancer, Obesity, and other chronic conditions, and the talk asks 'How does body fat cause insulin resistance?' The overarching theme is the relationship among body fat, insulin resistance, and chronic disease, making option C the best match. Option D is too narrow because it centers only on insulin's role rather than the broader fat-cell/insulin-resistance/chronic-disease relationship."",
   ""evidence"": [
@@ -257,7 +319,7 @@ qwen,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,Tru
     }
   ]
 }","{""completion_tokens"": 2364, ""completion_tokens_details"": {""reasoning_tokens"": 1988}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 89529, ""prompt_tokens"": 89785, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 92149}",
-qwen,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,114.94,1,api-rewatch,high,120000,"{
+qwen,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,114.94,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
   ""explanation"": ""The personal fat threshold is introduced first at ~581 s, followed by the question of what makes fat cells grow at ~886 s, and the insulin-diet relationship is introduced later at ~2033 s. This yields ①→②→③."",
   ""evidence"": [
@@ -282,7 +344,7 @@ qwen,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,Tr
   ]
 }","{""completion_tokens"": 4152, ""completion_tokens_details"": {""reasoning_tokens"": 3908}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 310149, ""prompt_tokens"": 310533, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 314685}",
 qwen,video-mme-623-3,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
-muse,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,False,,D,True,True,D,True,new failed-question retry,deepseek-v4-pro,21.26,1,api-rewatch,high,interactive-default,"{
+muse,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,False,,D,True,True,D,True,retained recovered pass,deepseek-v4-pro,21.26,1,api-rewatch,high,interactive-default,"{
   ""option"": ""D"",
   ""explanation"": ""The rewatch reading shows semisweet chocolate is poured into the empty transparent bowl first, and butter is added later on top before stirring, so chocolate appears first."",
   ""evidence"": [
@@ -294,15 +356,43 @@ muse,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrec
     }
   ]
 }","{""completion_tokens"": 674, ""completion_tokens_details"": {""reasoning_tokens"": 534}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 5756, ""prompt_tokens"": 6012, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 6686}",
-muse,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,False,,,False,unresolved baseline failure,,,0,,,,,,
-muse,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,False,,,False,unresolved baseline failure,,,0,,,,,,
+muse,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,175.73,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The supplied evidence contains a timestamped claim about a studio presenting a Wall Street Journal article with a Biden photo, but it does not describe any visual change to a man with short white hair and a pouting mouth (e.g., added glasses, hat, or hair color). No choice is source-grounded."",
+  ""evidence"": [
+    {
+      ""startMs"": 2042440,
+      ""endMs"": 2042440,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled event: Studio presents Wall Street Journal article 'Old Leaders Run the World' with Biden photo.""
+    }
+  ]
+}","{""completion_tokens"": 3392, ""completion_tokens_details"": {""reasoning_tokens"": 3248}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 7671, ""prompt_tokens"": 8055, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 11447}",
+muse,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,True,False,D,False,completed failed-question retry,deepseek-v4-pro,41.17,1,api-rewatch,high,120000,"{
+  ""option"": ""D"",
+  ""explanation"": ""At 25:59–26:02 the long chestnut-hair woman appears alone in a dark coat over white top with the spokesperson quote box displayed. At 26:10–26:14 she appears next to a man in a black suit/tie, now wearing a green coat. Thus the change is into a green coat."",
+  ""evidence"": [
+    {
+      ""startMs"": 1559000,
+      ""endMs"": 1562000,
+      ""kind"": ""visual"",
+      ""claim"": ""At 25:59-26:02 the long chestnut-hair woman appears alone in a dark coat over white top with the spokesperson quote box displayed.""
+    },
+    {
+      ""startMs"": 1570000,
+      ""endMs"": 1574000,
+      ""kind"": ""visual"",
+      ""claim"": ""At 26:10-26:14 the same woman appears next to a man in a black suit/tie, wearing a green coat.""
+    }
+  ]
+}","{""completion_tokens"": 1037, ""completion_tokens_details"": {""reasoning_tokens"": 812}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 9327, ""prompt_tokens"": 9839, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 10876}",
 muse,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 muse,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 muse,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 muse,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-9d45724237e86021e098,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
 muse,video-mme-428-1,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
 muse,video-mme-428-2,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-muse,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,32.17,1,api-rewatch,high,120000,"{
+muse,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,32.17,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""The video shows Ubisoft's prototype footage of an AI-powered NPC named Bloom. The on-screen label marks it as a GDC 2024 prototype (not actual game footage), and the dialogue with Bloom is presented as a real-time, AI-generated conversation rather than pre-set scripted content or a performance by real people."",
   ""evidence"": [
@@ -326,7 +416,7 @@ muse,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,Tru
     }
   ]
 }","{""completion_tokens"": 1506, ""completion_tokens_details"": {""reasoning_tokens"": 1218}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 7737, ""prompt_tokens"": 7993, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 9499}",
-muse,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,36.11,1,api-rewatch,high,120000,"{
+muse,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,36.11,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""The first goal shown is Portugal's 2006 goal; the scorer in red #17 shouts with fists clenched, then goes to his knees as teammates pile on him, matching kneeling and screaming."",
   ""evidence"": [
@@ -340,7 +430,7 @@ muse,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,False,,C,Tru
 }","{""completion_tokens"": 962, ""completion_tokens_details"": {""reasoning_tokens"": 827}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 6944, ""prompt_tokens"": 7200, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 8162}",
 muse,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
 muse,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-muse,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,13.83,1,api-rewatch,high,120000,"{
+muse,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,completed failed-question retry,deepseek-v4-pro,13.83,1,api-rewatch,high,120000,"{
   ""option"": ""B"",
   ""explanation"": ""The video is consistently described as an animated explainer about intercultural communication, with narrated lessons on cultural perspective, workplace differences, and the need for cultural intelligence, ending with credit to Dr. Deborah Swallow as a leading authority on intercultural communication. This aligns with quick ways to grasp fundamentals of intercultural communication, not conflicts, language learning, or political resolution."",
   ""evidence"": [
@@ -364,7 +454,7 @@ muse,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,Tru
     }
   ]
 }","{""completion_tokens"": 963, ""completion_tokens_details"": {""reasoning_tokens"": 656}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 31480, ""prompt_tokens"": 31864, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 32827}",
-muse,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,30.4,1,api-rewatch,high,120000,"{
+muse,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,30.4,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
   ""explanation"": ""The rewatch of 33.02–35.4s identifies the informally behaving staff (second from left behind the left counter, leaning then waving) as wearing a shirt with a dark floral flower pattern on a light base; original hue unknown."",
   ""evidence"": [
@@ -376,8 +466,19 @@ muse,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,Tr
     }
   ]
 }","{""completion_tokens"": 509, ""completion_tokens_details"": {""reasoning_tokens"": 371}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 8679, ""prompt_tokens"": 8935, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 9444}",
-muse,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,False,,,False,unresolved baseline failure,,,0,,,,,,
-muse,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,80.89,1,api-rewatch,high,120000,"{
+muse,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,92.12,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The supplied evidence only notes that a cartoon pilot flies an airplane over changing landscapes and landmarks (65.0s–88.48s). It does not name the places or identify a copilot itinerary, so none of the options can be confirmed as the place not traveled to."",
+  ""evidence"": [
+    {
+      ""startMs"": 65000,
+      ""endMs"": 88480,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled event: Cartoon pilot flies airplane over changing landscapes and landmarks.""
+    }
+  ]
+}","{""completion_tokens"": 1267, ""completion_tokens_details"": {""reasoning_tokens"": 1137}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 7536, ""prompt_tokens"": 7920, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 9187}",
+muse,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,80.89,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""The presentation is introduced as 'Fat: Why It Matters and What to Do About It,' and the sourced overview describes it as explaining how fat cell hypertrophy causes insulin resistance and contrasting caloric/endocrine theories, all centered on body fat, insulin resistance, and related metabolic conditions such as obesity and diabetes. Option D is too narrow because insulin's role is only one component of the talk, not the primary overall focus."",
   ""evidence"": [
@@ -401,7 +502,7 @@ muse,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,Tru
     }
   ]
 }","{""completion_tokens"": 1783, ""completion_tokens_details"": {""reasoning_tokens"": 1492}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 288939, ""prompt_tokens"": 289323, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 291106}",
-muse,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,88.8,1,api-rewatch,high,120000,"{
+muse,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,88.8,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
   ""explanation"": ""The personal fat threshold is introduced first around 581–585 s, followed by how to grow fat cells around 888–891 s, and the relationship between insulin and diet appears later around 2050–2052 s. Thus the order is ① → ② → ③."",
   ""evidence"": [
@@ -427,9 +528,37 @@ muse,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,Tr
 }","{""completion_tokens"": 1328, ""completion_tokens_details"": {""reasoning_tokens"": 1093}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 290311, ""prompt_tokens"": 290823, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 292151}",
 muse,video-mme-623-3,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
-minimax,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,A,B,False,,,False,unresolved baseline failure,,,0,,,,,,
-minimax,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,C,E,False,,,False,unresolved baseline failure,,,0,,,,,,
-minimax,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,,D,True,True,D,True,new failed-question retry,deepseek-v4-pro,25.97,1,api-rewatch,high,120000,"{
+minimax,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,A,B,True,False,E,False,completed failed-question retry,deepseek-v4-pro,59.21,1,api-rewatch,high,120000,"{
+  ""option"": ""E"",
+  ""explanation"": ""Direct rewatch shows at 34:17 the short-white-haired man appears beside 'THE WALL STREET JOURNAL' wearing dark sunglasses, and he is still wearing them at 34:19 when the article graphic appears. No gold/silver framed glasses, hat, or change to black hair is visible; the added item is a pair of sunglasses."",
+  ""evidence"": [
+    {
+      ""startMs"": 2057000,
+      ""endMs"": 2079000,
+      ""kind"": ""visual"",
+      ""claim"": ""At 34:17–34:39, the short-white-haired man is shown next to the 'THE WALL STREET JOURNAL' heading wearing dark sunglasses, which he adjusts with both hands; he continues wearing them, with no other visible change before the scene cuts away at 34:32.""
+    }
+  ]
+}","{""completion_tokens"": 2971, ""completion_tokens_details"": {""reasoning_tokens"": 2778}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 30296, ""prompt_tokens"": 30296, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 33267}",
+minimax,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,C,E,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,56.48,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The rewatch observation at 26:14–26:16 shows the woman initially in a black coat and white blouse next to a man in a dark suit, then the same woman appears in a pale pink dress beside the same-looking man. The visible change is to a pink dress, not to any coat, so none of the provided coat options is supported."",
+  ""evidence"": [
+    {
+      ""startMs"": 1574000,
+      ""endMs"": 1574000,
+      ""kind"": ""visual"",
+      ""claim"": ""The woman with long chestnut hair appears in a black coat and white blouse next to a man in a dark suit.""
+    },
+    {
+      ""startMs"": 1576000,
+      ""endMs"": 1576000,
+      ""kind"": ""visual"",
+      ""claim"": ""The same woman appears in a pale pink dress beside the same-looking man in a black suit, changing from the black coat and white blouse.""
+    }
+  ]
+}","{""completion_tokens"": 3180, ""completion_tokens_details"": {""reasoning_tokens"": 2958}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 13607, ""prompt_tokens"": 13991, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 17171}",
+minimax,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,,D,True,True,D,True,retained recovered pass,deepseek-v4-pro,25.97,1,api-rewatch,high,120000,"{
   ""option"": ""D"",
   ""explanation"": ""At 41:51–42:51, the re-watch observation records that when the screen text changes to 'GLOBAL WATCH', the man's right hand changes from resting flat on the table to holding and lifting a sheet of paper. This matches option D."",
   ""evidence"": [
@@ -441,7 +570,7 @@ minimax,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e8
     }
   ]
 }","{""completion_tokens"": 1469, ""completion_tokens_details"": {""reasoning_tokens"": 1313}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 12790, ""prompt_tokens"": 13302, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 14771}",
-minimax,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,False,B,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,39.92,3,api-rewatch,high,120000,"{
+minimax,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,False,B,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,39.92,3,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""At 20.2–27.0s, the man in the suit playing the instrument wears a dark tie. Because the footage is monochrome, only the tie's dark grayscale rendering is observable; its original color cannot be recovered. Among the options, the visible shade matches black."",
   ""evidence"": [
@@ -457,7 +586,7 @@ minimax,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e8
 minimax,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-9d45724237e86021e098,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,video-mme-428-1,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,video-mme-428-2,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-minimax,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,18.68,1,api-rewatch,high,120000,"{
+minimax,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,18.68,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""At 8:07–9:07, the screen shows a Ubisoft prototype label 'GDC 2024 BUILD - PROTOTYPE, NOT ACTUAL GAME FOOTAGE' and the content appears as a real-time conversation with an AI avatar. At 10:07–10:10, the discussion describes the game content as produced by a real-time AI-powered avatar that responds to the player rather than following a scripted sequence. This indicates the game content is generated by AI."",
   ""evidence"": [
@@ -478,7 +607,7 @@ minimax,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,
 minimax,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-minimax,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,18.23,1,api-rewatch,high,120000,"{
+minimax,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,completed failed-question retry,deepseek-v4-pro,18.23,1,api-rewatch,high,120000,"{
   ""option"": ""B"",
   ""explanation"": ""The video is an educational animation about intercultural communication. It presents key ideas such as cultural perspectives, direct vs indirect communication, egalitarian vs hierarchical management, and cultural intelligence. The closing title card identifies the presenter as 'Leading Authority on Intercultural Communication', confirming the topic is the fundamentals of intercultural communication."",
   ""evidence"": [
@@ -521,7 +650,7 @@ minimax,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,
   ]
 }","{""completion_tokens"": 1600, ""completion_tokens_details"": {""reasoning_tokens"": 1183}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 60270, ""prompt_tokens"": 60526, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 62126}",
 minimax,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
-minimax,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,C,False,new failed-question retry,deepseek-v4-pro,37.94,1,api-rewatch,high,120000,"{
+minimax,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,C,False,completed failed-question retry,deepseek-v4-pro,37.94,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""A direct rewatch of 70–97s reports that the copilot travels over a landscape containing landmarks such as the Eiffel Tower and pyramids, but does not travel to the pyramid area."",
   ""evidence"": [
@@ -533,31 +662,31 @@ minimax,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B
     }
   ]
 }","{""completion_tokens"": 3109, ""completion_tokens_details"": {""reasoning_tokens"": 2956}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 13424, ""prompt_tokens"": 13680, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 16789}",
-minimax,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,False,D,False,new failed-question retry,deepseek-v4-pro,52.52,2,api-rewatch,high,120000,"{
+minimax,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,False,D,False,completed failed-question retry,deepseek-v4-pro,158.24,3,api-rewatch,high,120000,"{
   ""option"": ""D"",
-  ""explanation"": ""The title slide identifies the presentation as 'Shrinking Fat Cells: Energy vs. Insulin' by Benjamin Bikman, PhD, and the reconciled overview states he explains how insulin, not just energy balance, drives fat cell size and insulin resistance. Later clips directly state that elevated insulin and sufficient energy are needed for fat cell growth and that insulin promotes fat storage / low insulin forces fat cells to shrink, supporting the primary focus on insulin's role in regulating fat mass and related metabolic conditions."",
+  ""explanation"": ""The presentation focuses on insulin's role in regulating fat cell growth, obesity, and diabetes, with explicit statements that insulin is essential for promoting and maintaining fat mass. Option D captures this central insulin-centric theme more precisely than the broader body fat-disease relationship in option C."",
   ""evidence"": [
     {
-      ""startMs"": 83851,
+      ""startMs"": 83951,
       ""endMs"": 89850,
       ""kind"": ""visual"",
-      ""claim"": ""Title slide 'Shrinking Fat Cells: Energy vs. Insulin' with speaker Benjamin Bikman, PhD, Professor of Cell Biology, Brigham Young University.""
+      ""claim"": ""Title slide 'Shrinking Fat Cells: Energy vs. Insulin' and speaker Benjamin Bikman, PhD, introduced at Metabolic Health Summit.""
     },
     {
-      ""startMs"": 0,
-      ""endMs"": 2667064,
-      ""kind"": ""computed"",
-      ""claim"": ""Reconciled overview: presentation explains how insulin, not just energy balance, drives fat cell size and insulin resistance.""
+      ""startMs"": 43760,
+      ""endMs"": 55080,
+      ""kind"": ""transcript"",
+      ""claim"": ""Narrator states Bikman's focus is to better understand the role of elevated insulin and nutrient signaling in regulating obesity, diabetes, and dementia.""
     },
     {
-      ""startMs"": 1335950,
-      ""endMs"": 1341950,
-      ""kind"": ""visual"",
-      ""claim"": ""Slide states 'Insulin promotes fat storage'.""
+      ""startMs"": 1780600,
+      ""endMs"": 1785600,
+      ""kind"": ""transcript"",
+      ""claim"": ""Speaker says insulin has an absolutely essential role in promoting and maintaining fat mass.""
     }
   ]
-}","{""completion_tokens"": 1416, ""completion_tokens_details"": {""reasoning_tokens"": 1123}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 69211, ""prompt_tokens"": 69211, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 70627}",
-minimax,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,40.41,1,api-rewatch,high,120000,"{
+}","{""completion_tokens"": 2622, ""completion_tokens_details"": {""reasoning_tokens"": 2365}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 295977, ""prompt_tokens"": 296361, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 298983}",
+minimax,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,40.41,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
   ""explanation"": ""The personal fat threshold is introduced first around 599.695–605.695s with the slide title and human silhouette. Fat-cell growth via hyperplasia is introduced next around 684.695–689.83s with the question 'What if we could force fat to store more fat?'. The relationship between insulin and diet is introduced later around 1351.95–1411.95s when the speaker describes fat cells grown in a 'sea of fats and glucose' and insulin telling them what to do with that energy. Therefore the order is ①②③."",
   ""evidence"": [

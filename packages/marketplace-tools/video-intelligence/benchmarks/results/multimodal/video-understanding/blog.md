@@ -4,12 +4,12 @@
 
 These are **cumulative development recoveries**, not fresh full-suite accuracies or a fair new ranking of the models. Previously passing questions were not tested on the final implementation or new answer backbone. Reference options and all original 19-question denominators remain unchanged.
 
-| Reader | Original correct | Recovered / original failures | Cumulative correct | Distinct scorable retries |
+| Reader | Original correct | Recovered / original failures | Cumulative correct | Completed failed questions |
 | --- | ---: | ---: | ---: | ---: |
-| Latest Gemini reader | 10/19 | 5/9 | 15/19 | 8 |
-| Qwen 3.8 Max reader | 11/19 | 3/8 | 14/19 | 5 |
-| Muse Spark 1.3 reader | 9/19 | 6/10 | 15/19 | 7 |
-| MiniMax M3 reader | 10/19 | 4/9 | 14/19 | 7 |
+| Latest Gemini reader | 10/19 | 5/9 | 15/19 | 9/9 |
+| Qwen 3.8 Max reader | 11/19 | 4/8 | 15/19 | 8/8 |
+| Muse Spark 1.3 reader | 9/19 | 6/10 | 15/19 | 10/10 |
+| MiniMax M3 reader | 10/19 | 4/9 | 14/19 | 9/9 |
 
 The latest baseline is `run-79f3b55b0359ec26d60c`. The other readers use the completed pilot requested by the user, `run-9d45724237e86021e098`; its first and second reader phases are joined by question ID, giving exactly 19 unique questions per reader. Baseline passes remain immutable. `results.csv` records every retained or retried answer, output origin, official option, attempt count, measured standalone latency, reasoning setting, timeout and available token usage. Empty cash-cost fields mean **unknown**, not zero.
 
@@ -61,3 +61,19 @@ The user authorized a fresh attempt on the latest reader’s coat-change questio
 Both new vision requests **completed**, so this attempt did not reproduce the prior 12-second interruption. Neither reading established the requested transition: the first saw several women without matching all clothing qualifiers; the later window saw the dark-coat/white-blouse subject alone. Both returned `coverageComplete=false` and `settlesQuestion=false`. The canonical bridge requested a managed fallback unavailable in this API-only execution, leaving that visual follow-up **unscored** rather than inventing a final answer. These readings do not prove the transition is absent from the full video. The latest cumulative score therefore remains **15/19**.
 
 The two original provider outcomes remain unknown; successful new requests do not reconcile or refund them. Provider cash cost remains unknown. Approval, the preserved original receipt references, new findings and usage are recorded in `data/managed-retries-20261117/approved-retry-20261118.json`. No other failed question or previously correct answer was repeated. No product code or deployment changed in this follow-up. The separate managed-indexing and general CI limitations remain open.
+
+## Completed failed-question recovery — 18 November 2026
+
+All **36 originally failed reader/question cells** now have a completed final-answer attempt: 9/9 latest, 8/8 Qwen, 10/10 Muse and 9/9 MiniMax. The other 40 cells retain their historical passes without another question submission. Completed abstentions count as wrong; blocked execution attempts are not scored. This completes the requested failed-only evaluation coverage, **not** a perfect answer rate or a fresh 19-question regression run. Scores remain **15/19, 15/19, 15/19 and 14/19**, respectively; the requested 16–17/19 target was not reached.
+
+The new confirmed recovery is Qwen’s airline-counter clothing-pattern question. The targeted canonical path correctly returned both staff descriptions rather than merging their attributes, and DeepSeek selected the flower-pattern option. Other remaining official failures did not turn into verified correct answers. The coat-change question has multiple nearby appearances; readers selected an earlier light blazer or green coat, or abstained, instead of aligning the reference’s pink-clothing appearance. Local contact-sheet review shows the pink appearance exists, so this remains a temporal/subject-selection limitation, not a newly corrected gold label. The three previously documented reference issues remain in the official denominator. MiniMax’s primary-topic question also remains wrong.
+
+Four additional general defects were reproduced and fixed with independent fixtures. Source scope was wrongly allowed to treat broad index coverage as proof of a missing detail; the detail path now requires question-specific verification. Resolve requests could prefer an unrelated ending, and source-wide detail requests could continue cursor pages and repeat inspection after a direct read; both are corrected. Healthy partial observations are now delivered with an explicitly unconfirmed verdict. Most significantly, coarse aggregate ranges could send nearly the whole 52-minute source to FFmpeg for a purported interactive read. Every inspection target is now bounded to 60 seconds; expired decoders also receive a forced stop after a short termination grace period. The visual reader has a 2,048-token output limit and low reasoning, while DeepSeek planning and final synthesis retain deliberate reasoning.
+
+The benchmark adapter also misclassified local empty-frame/decoder failures as unknown paid provider outcomes, discarding separate completed readings. It now preserves healthy canonical evidence while retaining every uncertain provider fence. Article attempts for Qwen and Muse were reconciled using **zero new vision calls** after that correction. Full request, plan, source-guidance and blocked-attempt metadata is in `data/managed-retries-20261117/completion-20261118.json`. New paid outcomes that remain unknown are appended to the existing ledger; successful later calls neither reconcile nor refund them. Cash cost remains unknown.
+
+The follow-up release is Video Intelligence **0.3.21** and workspace-server **0.2.71**. It uses the existing hosted providers and Modal service; no RunPod or ECS inference was introduced. Final Cloud and CI verification is recorded in `data/managed-retries-20261117/release-verification.json`. The previously documented managed-indexing discrepancy is not established as fixed by these standalone retries.
+
+A final independent **real managed Cloud/Modal acceptance** also passed: a four-second blue fixture with the centered word “VERIFYFRAME” returned both the correct background color and exact word. This was not a benchmark question and did not change any score. The uploaded source follows the control plane’s normal source cleanup. Cloud synchronization and deployment completed successfully; public API health and the web login route returned HTTP 200. The native service path is healthy on this fixture; the older source-specific blank-frame claim remains a separate limitation.
+
+Final code verification: 138 canonical video tests passed locally and on Windows, the dedicated Video Intelligence Linux workflow passed, and the new visual-budget regression passed on Linux and Windows. The whole-repository matrix remains **not green**: Linux/Windows structured-analysis tests lack pandas, Windows has an unrelated policy snapshot failure, and macOS CI was cancelled. The local server suite’s one Python matching timeout passed on its isolated retry. npm publication remains user-owned.

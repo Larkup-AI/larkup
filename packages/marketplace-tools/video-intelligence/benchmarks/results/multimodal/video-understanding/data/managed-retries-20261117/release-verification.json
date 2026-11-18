@@ -1,43 +1,67 @@
 {
-  "packageVersion": "0.3.20",
-  "canonicalReleaseCommit": "75dc70ece56ab22d52f72692e1d95e9943338791",
-  "modal": "Existing larkup-video-intelligence app deployed; ordered T4/L4 allocation, one worker.",
+  "packageVersion": "0.3.21",
+  "workspaceServerVersion": "0.2.71",
+  "canonicalFixCommit": "ae767db9",
+  "canonicalReleaseCommit": "037166b9c56777a2d69bed4e6a7bda40c992223e",
+  "portableTestCommit": "cfd8f5115f775ed1a98d808955b35a32ae9774d9",
   "cloud": {
-    "sync": "passed",
-    "releaseGate": "types, tests, lint and production builds passed",
-    "deployment": "healthy; build cache disabled",
+    "sync": "passed: types, tests, lint, canonical boundaries and production builds",
+    "deployment": "healthy; both builds explicitly skipped restored build cache",
     "api": "https://console-api.larkup.de",
     "apiHealthHttp": 200,
     "web": "https://console.larkup.de",
-    "webHttp": 200,
-    "ecsWorkerChanged": false
+    "webLoginHttp": 200,
+    "ecsWorkerChanged": false,
+    "modalWorkerChangedInThisFollowUp": false
   },
   "verification": {
-    "videoPackage": "134 tests, type-check and build passed",
-    "nativeVision": "47 tests passed",
-    "gpuProviders": "149 tests passed with localhost fixture permission; prior run encountered intermittent local HTTP/FFmpeg fixture truncation",
-    "controlPlane": "33 tests passed",
-    "benchmarkPython": "25 tests passed",
-    "benchmarkNode": "9 tests passed"
+    "videoPackage": "138 tests, types and build passed locally on macOS; 138 tests also passed in Windows CI; dedicated Linux Video Intelligence workflow passed",
+    "workspaceServer": "Types/build passed. Full local suite: 187/188 passed initially; unrelated 1,000-row Python matching test timed out, then passed in isolated retry without code changes. Final decoder-independent visual generation test passed locally and in Linux/Windows CI.",
+    "benchmarkAdapters": "11 Node tests passed, including paid fences and local/provider failure classification; four answer evidence tests passed.",
+    "canonicalBoundaries": "passed"
   },
   "github": {
     "videoWorkflow": {
-      "runId": 44175654484,
+      "runId": 44253117995,
       "conclusion": "success"
     },
     "generalCI": {
-      "runId": 44175654454,
-      "conclusion": "cancelled with failed jobs",
-      "build": "success",
-      "secretScan": "success",
-      "linuxQuality": "failed: unrelated workspace-server structured analysis tests require unavailable pandas",
-      "windows": "failed: workspace-server policy snapshot and missing pandas; Python execution quoting test",
+      "runId": 44254244363,
+      "linuxQuality": "failed: two unrelated structured-analysis tests lack pandas",
+      "windows": "failed: unrelated CHAT_POLICY golden snapshot and two structured-analysis tests lack pandas",
       "macOS": "cancelled before steps",
-      "desktop": "failed; outside video scope"
+      "build": "in progress at evidence capture",
+      "secretScan": "success",
+      "desktop": "outside task scope"
     },
-    "crossPlatformGate": "NOT satisfied; do not interpret successful video CI as a green whole-repository matrix"
+    "visualBudgetRegression": "Passed on Linux job 134632087283 and Windows job 134632087768. Initial test incorrectly required installed FFmpeg; replaced only its decoder boundary with a mock, retaining provider-budget and frame-delivery assertions.",
+    "crossPlatformGate": "Whole-repository matrix NOT green; macOS CI cancelled, Linux/Windows unrelated failures remain. Do not claim full release CI is green."
   },
-  "liveAcceptance": "Native provider preflight passed. Managed inspection completed but reported blank frames contrary to the local source; discrepancy unresolved, excluded from accuracy. Standalone API re-watch recovery is not live Cloud-chat acceptance.",
-  "npm": "Not published; user-owned publication command: cd ../larkup && ./scripts/auto-publish.sh --npm-only",
-  "paidRequests": "Five unknown vision outcomes retained; no automatic replay."
+  "managedAcceptance": {
+    "status": "completed",
+    "jobId": "job_6cd553717467cd74ad8e8511",
+    "fixture": "4-second blue background with centered VERIFYFRAME label",
+    "semanticText": "A solid bright blue screen displays the capitalized white word 'VERIFYFRAME' centered horizontally across the middle of the frame from frame 0 through frame 2 without any changes or movement.\nOn screen: 'VERIFYFRAME' — Centered on-screen title or verification marker\nHappened: The word VERIFYFRAME remains displayed continuously on a blue background\nDirect component: The background color is blue.\nDirect component: The large centered word is VERIFYFRAME.\nClaim question: What background color and word are visible?\nClaim verdict: direct\nClaim answer: The background color is blue and the centered word is VERIFYFRAME.\nClaim bindings: [{\"subject\":\"screen\",\"relation\":\"has background color\",\"value\":\"blue\"},{\"subject\":\"screen\",\"relation\":\"displays centered word\",\"value\":\"VERIFYFRAME\"}]\nUncertainty: none",
+    "verifiedNonblank": true,
+    "coverage": {
+      "requested": "thorough",
+      "sourceFrames": 16,
+      "decodedFrames": 8,
+      "analyzedFrames": 8,
+      "visualSampleIntervalSecs": 2.5,
+      "ocrSampleIntervalSecs": 2.5,
+      "heavyOperatorsDisabled": false,
+      "priorityRanges": [],
+      "semanticClips": 1,
+      "selectedSemanticClips": 1,
+      "semanticClipBudget": 1,
+      "samplingGuarantee": "sampled-evidence-only",
+      "briefEventsMayBeMissed": true
+    },
+    "notBenchmarkQuestion": true
+  },
+  "managedLimit": "The independent native-provider fixture proves visible frames and text traverse the existing authenticated managed Cloud/Modal service. It does not resolve the older source-specific blank-frame claim or establish full live Cloud-chat benchmark latency.",
+  "benchmark": "All 36 original failures have a completed final-answer attempt; 40 historical passes untouched. Latest/Qwen/Muse/MiniMax cumulative totals are 15/19,15/19,15/19,14/19. Completed abstentions count wrong; infrastructure attempts excluded. No 16–17/19 target claim.",
+  "paidRequests": "Six provider outcomes remain unknown, including five preserved earlier requests and one additional Qwen timeout. Completed later calls do not reconcile or refund them. Cash cost unknown.",
+  "npm": "Not published; user-owned command: cd ../larkup && ./scripts/auto-publish.sh --npm-only"
 }

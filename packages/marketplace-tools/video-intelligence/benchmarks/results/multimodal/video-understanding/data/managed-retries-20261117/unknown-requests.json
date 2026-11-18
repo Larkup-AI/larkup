@@ -43,5 +43,15 @@
     "fingerprint": "0e65c36acc914e94601014f2ec059e19edd8b2ae7d993482115343a622570385",
     "state": "provider-outcome-unknown",
     "policy": "Retain receipt; do not replay automatically."
+  },
+  {
+    "reader": "qwen",
+    "questionId": "video-mme-010-2",
+    "namespace": "completion-20261118",
+    "fingerprint": "713d3f34e013b6d286c25df44f4dca8da213acc2bfbae4e40732b462f2d4e489",
+    "model": "alibaba/qwen3.8-max",
+    "state": "provider-outcome-unknown",
+    "submittedAt": "2026-11-18T06:17:55.478Z",
+    "policy": "Original outcome remains unknown; subsequent explicitly authorized condition does not reconcile or refund this call."
   }
 ]

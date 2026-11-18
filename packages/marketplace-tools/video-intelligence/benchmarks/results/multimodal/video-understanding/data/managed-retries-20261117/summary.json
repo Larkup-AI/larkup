@@ -1,49 +1,57 @@
 {
-  "method": "Cumulative development recovery, not fresh full-suite accuracy. Historical passes are untested on the new revision.",
+  "method": "Completed failed-question recovery ledger; historical passes retained, not a new 19-question full-suite run. Every originally failed question now has a completed final-answer attempt; abstentions count as incorrect.",
   "rows": [
     {
       "reader": "latest",
       "baselineCorrect": 10,
       "failedQuestions": 9,
-      "newAnswered": 8,
+      "newAnswered": 9,
       "newCorrect": 5,
-      "completedAttempts": 12,
+      "completedAttempts": 15,
       "unknownVisionRequests": 2,
       "cumulativeCorrect": 15,
-      "total": 19
+      "total": 19,
+      "completedAbstentions": 1,
+      "allOriginalFailuresHaveCompletedAnswer": true
     },
     {
       "reader": "qwen",
       "baselineCorrect": 11,
       "failedQuestions": 8,
-      "newAnswered": 5,
-      "newCorrect": 3,
-      "completedAttempts": 5,
-      "unknownVisionRequests": 2,
-      "cumulativeCorrect": 14,
-      "total": 19
+      "newAnswered": 8,
+      "newCorrect": 4,
+      "completedAttempts": 8,
+      "unknownVisionRequests": 3,
+      "cumulativeCorrect": 15,
+      "total": 19,
+      "completedAbstentions": 3,
+      "allOriginalFailuresHaveCompletedAnswer": true
     },
     {
       "reader": "muse",
       "baselineCorrect": 9,
       "failedQuestions": 10,
-      "newAnswered": 7,
+      "newAnswered": 10,
       "newCorrect": 6,
-      "completedAttempts": 7,
+      "completedAttempts": 10,
       "unknownVisionRequests": 1,
       "cumulativeCorrect": 15,
-      "total": 19
+      "total": 19,
+      "completedAbstentions": 2,
+      "allOriginalFailuresHaveCompletedAnswer": true
     },
     {
       "reader": "minimax",
       "baselineCorrect": 10,
       "failedQuestions": 9,
-      "newAnswered": 7,
+      "newAnswered": 9,
       "newCorrect": 4,
-      "completedAttempts": 10,
+      "completedAttempts": 13,
       "unknownVisionRequests": 0,
       "cumulativeCorrect": 14,
-      "total": 19
+      "total": 19,
+      "completedAbstentions": 1,
+      "allOriginalFailuresHaveCompletedAnswer": true
     }
   ]
 }

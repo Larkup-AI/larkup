@@ -2737,5 +2737,1088 @@
       "total_tokens": 39267
     },
     "valid_format": false
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-completion-v1",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1459.098,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object or garment category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1399.098
+          },
+          {
+            "endSecs": 1592.624,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object or garment category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1532.624
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "4f7d78a1aa5142ca0086d9a3de09656ca95ae38902407e45e31dfd17faae4291"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "7f4535657d337cd62c2ca481664210952515fb7e3484e8e406f98c6ca2fee886"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "4f7d78a1aa5142ca0086d9a3de09656ca95ae38902407e45e31dfd17faae4291"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "7f4535657d337cd62c2ca481664210952515fb7e3484e8e406f98c6ca2fee886"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 2,
+        "established": 2
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The only supported later outfit is a light beige/tan blazer over a white top (25:32–26:32). None of the options (gray, red, purple floral, green, pink) matches that observed change, so no option can be selected.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1532624,\n      \"endMs\": 1592624,\n      \"kind\": \"visual observation\",\n      \"claim\": \"At 25:32–26:32, the woman with long chestnut hair changes into a light beige/tan blazer over a white top when beside the man in a black suit; this does not match any listed coat color.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:12:35.668792Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bb23e4a700ac9b6463e97e235b5937356e641e38df2ee5530bc72c62bb63152e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 56.3,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2443,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2280
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 8683,
+      "prompt_tokens": 9067,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 11510
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-completion-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1579,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object or garment category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "d7a92f34a60d38acb1934d524f53718c6f505eb50c0de8ceafdc51f8165c3521"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "d7a92f34a60d38acb1934d524f53718c6f505eb50c0de8ceafdc51f8165c3521"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The rewatch at 25:58–26:19 shows that when the woman (the Princess of Wales) appears next to a man in a black suit, her attire changes from the dark coat to a dark green coat over a cream top.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1558000,\n      \"endMs\": 1579000,\n      \"kind\": \"visual\",\n      \"claim\": \"When the Princess of Wales appears next to a man wearing a black suit and glasses, her attire changes from the dark coat to a dark green coat over a cream top, and the on-screen quote graphic from Kensington Palace disappears.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:14:39.861471Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bb23e4a700ac9b6463e97e235b5937356e641e38df2ee5530bc72c62bb63152e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 45.97,
+    "predicted": "D",
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1853,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1698
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 22915,
+      "prompt_tokens": 22915,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 24768
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-completion-v3",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 115,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 43.4,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 25.020000000000003
+          },
+          {
+            "endSecs": 68.58,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 45.08
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "2296b9f24465e31f3ee13ceed77630bc275da1568fd1ad77a80cd3bdfec76328"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "50c8bdacb3ac971f3e7f822cb8b9b6491a05055f2e2a324a675c047e07626cd2"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "bf2f3f1497af425272518bae4263faf4cce4d79e11ddb33ef7278eabb4733e74"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "2296b9f24465e31f3ee13ceed77630bc275da1568fd1ad77a80cd3bdfec76328"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "50c8bdacb3ac971f3e7f822cb8b9b6491a05055f2e2a324a675c047e07626cd2"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "bf2f3f1497af425272518bae4263faf4cce4d79e11ddb33ef7278eabb4733e74"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 115,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 43.4,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 25.020000000000003
+          },
+          {
+            "endSecs": 68.58,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 45.08
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 115,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 43.4,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 25.020000000000003
+          },
+          {
+            "endSecs": 68.58,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 45.08
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 115,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 43.4,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 25.020000000000003
+          },
+          {
+            "endSecs": 68.58,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 45.08
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The evidence shows the plane traveling over the Eiffel Tower and a double-decker bus (London) at 0:00–1:55, and over Taj Mahal and Petronas Towers at 1:02–1:28. However, it does not identify which of the listed alternatives is not visited; the direct reading states the place cannot be definitively determined. Therefore no option can be selected.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 115000,\n      \"kind\": \"directObservation\",\n      \"claim\": \"The animation shows the pilot flying over a double-decker bus (representing London/the UK) and the Eiffel Tower (representing Paris/France), but without the specific list of multiple-choice options being asked about, the place he does not travel to cannot be definitively determined.\"\n    },\n    {\n      \"startMs\": 61920,\n      \"endMs\": 88480,\n      \"kind\": \"reconciledEvent\",\n      \"claim\": \"Airplane flying over landscapes and landmarks including Taj Mahal and Petronas Towers\"\n    },\n    {\n      \"startMs\": 79600,\n      \"endMs\": 88480,\n      \"kind\": \"reconciledEvent\",\n      \"claim\": \"Airplane flies past world landmark drawings including Taj Mahal and Petronas Towers\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:19:28.765760Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "a10918f3b761c1426a1bf43b4afbe566f8275baf0314ee769effa7bcf39bca9e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 175.65,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 7207,
+      "completion_tokens_details": {
+        "reasoning_tokens": 6898
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 10698,
+      "prompt_tokens": 11082,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 18289
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-completion-v1",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 2079,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object or garment category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 2057
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "b06659bd4d7205b855ffb97bbd43e6e4a087a4470b5e5bf11f5353b59c6c8268"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "b06659bd4d7205b855ffb97bbd43e6e4a087a4470b5e5bf11f5353b59c6c8268"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"E\",\n  \"explanation\": \"Direct rewatch shows at 34:17 the short-white-haired man appears beside 'THE WALL STREET JOURNAL' wearing dark sunglasses, and he is still wearing them at 34:19 when the article graphic appears. No gold/silver framed glasses, hat, or change to black hair is visible; the added item is a pair of sunglasses.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2057000,\n      \"endMs\": 2079000,\n      \"kind\": \"visual\",\n      \"claim\": \"At 34:17–34:39, the short-white-haired man is shown next to the 'THE WALL STREET JOURNAL' heading wearing dark sunglasses, which he adjusts with both hands; he continues wearing them, with no other visible change before the scene cuts away at 34:32.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:19:29.768852Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "369a23c62498aafa8d724969aaf4b427f88219f66a4fd2a870a111142d8f1de0",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 59.21,
+    "predicted": "E",
+    "questionId": "longvideobench-Fw1rirubXiU_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2971,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2778
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 30296,
+      "prompt_tokens": 30296,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 33267
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-completion-v1",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1582,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object or garment category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "74cc286e50866cbc648365107f2a1e05a217c6803945751031c2d84be533abc9"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "74cc286e50866cbc648365107f2a1e05a217c6803945751031c2d84be533abc9"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The rewatch observation at 26:14–26:16 shows the woman initially in a black coat and white blouse next to a man in a dark suit, then the same woman appears in a pale pink dress beside the same-looking man. The visible change is to a pink dress, not to any coat, so none of the provided coat options is supported.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1574000,\n      \"endMs\": 1574000,\n      \"kind\": \"visual\",\n      \"claim\": \"The woman with long chestnut hair appears in a black coat and white blouse next to a man in a dark suit.\"\n    },\n    {\n      \"startMs\": 1576000,\n      \"endMs\": 1576000,\n      \"kind\": \"visual\",\n      \"claim\": \"The same woman appears in a pale pink dress beside the same-looking man in a black suit, changing from the black coat and white blouse.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:20:28.983101Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "369a23c62498aafa8d724969aaf4b427f88219f66a4fd2a870a111142d8f1de0",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 56.48,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3180,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2958
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 13607,
+      "prompt_tokens": 13991,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 17171
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-completion-v3",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 384
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 432
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 480
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 528
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 576
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 624
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 672
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 720
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 768
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 816
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 864
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 912
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 960
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1008
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1056
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1104
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1152
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1200
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1248
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1296
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1344
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1392
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1440
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1488
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1536
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1584
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1632
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1680
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1728
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1776
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1824
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1872
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1920
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1968
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2016
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2064
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The presentation focuses on insulin's role in regulating fat cell growth, obesity, and diabetes, with explicit statements that insulin is essential for promoting and maintaining fat mass. Option D captures this central insulin-centric theme more precisely than the broader body fat-disease relationship in option C.\",\n  \"evidence\": [\n    {\n      \"startMs\": 83951,\n      \"endMs\": 89850,\n      \"kind\": \"visual\",\n      \"claim\": \"Title slide 'Shrinking Fat Cells: Energy vs. Insulin' and speaker Benjamin Bikman, PhD, introduced at Metabolic Health Summit.\"\n    },\n    {\n      \"startMs\": 43760,\n      \"endMs\": 55080,\n      \"kind\": \"transcript\",\n      \"claim\": \"Narrator states Bikman's focus is to better understand the role of elevated insulin and nutrient signaling in regulating obesity, diabetes, and dementia.\"\n    },\n    {\n      \"startMs\": 1780600,\n      \"endMs\": 1785600,\n      \"kind\": \"transcript\",\n      \"claim\": \"Speaker says insulin has an absolutely essential role in promoting and maintaining fat mass.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:28:25.413159Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "64ab625e9517ff4ee23b3e9c0d562341a208f15c7c736302808b51e64b58bf29",
+    "indexVariantId": "larkup-quality-v9-vb-minimax-deepseek",
+    "latencySecs": 158.24,
+    "predicted": "D",
+    "questionId": "video-mme-623-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2622,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2365
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 295977,
+      "prompt_tokens": 296361,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 298983
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-completion-v3",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 3128.826,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 3110.766,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 131.072
+          },
+          {
+            "endSecs": 2893.483,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 165.84
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchFailed",
+        "outcomeRequiresReconciliation": false
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 0,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The supplied evidence contains a timestamped claim about a studio presenting a Wall Street Journal article with a Biden photo, but it does not describe any visual change to a man with short white hair and a pouting mouth (e.g., added glasses, hat, or hair color). No choice is source-grounded.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2042440,\n      \"endMs\": 2042440,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled event: Studio presents Wall Street Journal article 'Old Leaders Run the World' with Biden photo.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:33:13.283470Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "080c62d27babd195c706b5390f261454b20ff8ad0b009b1613de9e571be567fc",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 175.73,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3392,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3248
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 7671,
+      "prompt_tokens": 8055,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 11447
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-completion-v3",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1582,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "d79da72fb94f8a0f3f25ca3d1a5c3cd54826d10d6ac7f117fbe1816d626b9c8a"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "d79da72fb94f8a0f3f25ca3d1a5c3cd54826d10d6ac7f117fbe1816d626b9c8a"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"At 25:59–26:02 the long chestnut-hair woman appears alone in a dark coat over white top with the spokesperson quote box displayed. At 26:10–26:14 she appears next to a man in a black suit/tie, now wearing a green coat. Thus the change is into a green coat.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1559000,\n      \"endMs\": 1562000,\n      \"kind\": \"visual\",\n      \"claim\": \"At 25:59-26:02 the long chestnut-hair woman appears alone in a dark coat over white top with the spokesperson quote box displayed.\"\n    },\n    {\n      \"startMs\": 1570000,\n      \"endMs\": 1574000,\n      \"kind\": \"visual\",\n      \"claim\": \"At 26:10-26:14 the same woman appears next to a man in a black suit/tie, wearing a green coat.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:37:57.472972Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "080c62d27babd195c706b5390f261454b20ff8ad0b009b1613de9e571be567fc",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 41.17,
+    "predicted": "D",
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1037,
+      "completion_tokens_details": {
+        "reasoning_tokens": 812
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 9327,
+      "prompt_tokens": 9839,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 10876
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-completion-v3",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 60,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 43.4,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 25.020000000000003
+          },
+          {
+            "endSecs": 68.58,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 45.08
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "af725d5d728ddb3461b4f06154021e2ed7f1820db7a0cefe348dec3a9655ed7a"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "bb37a1e1c365c0640b766ddf60fda940b5fbe617cde71c2d8b8975bd2589a961"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "ea37a481992377d9ab08a33dd64c546b82e687108c6e8c49b33fe66ec4d8de7f"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "ea37a481992377d9ab08a33dd64c546b82e687108c6e8c49b33fe66ec4d8de7f"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "af725d5d728ddb3461b4f06154021e2ed7f1820db7a0cefe348dec3a9655ed7a"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "bb37a1e1c365c0640b766ddf60fda940b5fbe617cde71c2d8b8975bd2589a961"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The supplied evidence only notes that a cartoon pilot flies an airplane over changing landscapes and landmarks (65.0s–88.48s). It does not name the places or identify a copilot itinerary, so none of the options can be confirmed as the place not traveled to.\",\n  \"evidence\": [\n    {\n      \"startMs\": 65000,\n      \"endMs\": 88480,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled event: Cartoon pilot flies airplane over changing landscapes and landmarks.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:38:38.651249Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "31ea44e4837ce0c75b6888f7ce85ec609f6a76af8211997389876edbc7435939",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 92.12,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1267,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1137
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 7536,
+      "prompt_tokens": 7920,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 9187
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-completion-v1",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 3128.826,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 3110.766,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 131.072
+          },
+          {
+            "endSecs": 2893.483,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 165.84
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchFailed",
+        "outcomeRequiresReconciliation": false
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 0,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The only evidence related to 'THE WALL STREET JOURNAL' is a WSJ headline 'Old Leaders Run the World' displayed with a Biden photo at approximately 2041.9–2056.9s. The evidence does not describe any change to the man, such as additional glasses, a hat, sunglasses, or hair color change, so none of the options can be established.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2041873,\n      \"endMs\": 2056873,\n      \"kind\": \"computed\",\n      \"claim\": \"WSJ headline 'Old Leaders Run the World' displayed with Biden photo.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:33:13.866398Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "e8857a94757b212ded64251822b00368443f0c745685e432a679a556f9dbf709",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 174.32,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3417,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3263
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 10346,
+      "prompt_tokens": 10730,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 14147
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-completion-v1",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1582,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "f021ffa2e19d7baa1b0a3fb3087f2e607de70e2c7cbc40641c440a0af6890294"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "f021ffa2e19d7baa1b0a3fb3087f2e607de70e2c7cbc40641c440a0af6890294"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The supplied evidence does not establish the woman's identity or any coat change. The targeted rewatch at 25:58–26:22 (1558–1582) reported visual attribution withheld, and the later B-roll note at ~1590.5s only describes a couple walking, without identifying a coat color change. Therefore no option can be selected.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1558000,\n      \"endMs\": 1582000,\n      \"kind\": \"direct-observation\",\n      \"claim\": \"Rewatch of 1558–1582 reported visual attribution withheld; no actor identity or action established.\"\n    },\n    {\n      \"startMs\": 1580512,\n      \"endMs\": 1592624,\n      \"kind\": \"visual\",\n      \"claim\": \"Visual reading at ~1590.5 does not describe any coat color change; only a well-dressed couple walking near a grey car.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T06:37:57.226636Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "e8857a94757b212ded64251822b00368443f0c745685e432a679a556f9dbf709",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 110.32,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3862,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3643
+      },
+      "prompt_cache_hit_tokens": 640,
+      "prompt_cache_miss_tokens": 11765,
+      "prompt_tokens": 12405,
+      "prompt_tokens_details": {
+        "cached_tokens": 640
+      },
+      "total_tokens": 16267
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-completion-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 42.9,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 33.02
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "235e3e6c7173bf27fad272d1e3fc73ce5d771e0ff6d92e0f003a5e127fc6139f"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "235e3e6c7173bf27fad272d1e3fc73ce5d771e0ff6d92e0f003a5e127fc6139f"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The casually dressed staff member at the left AB AIRLINE counter who waves is identified as wearing a floral shirt, matching 'A flower'.\",\n  \"evidence\": [\n    {\n      \"startMs\": 33020,\n      \"endMs\": 42900,\n      \"kind\": \"visual\",\n      \"claim\": \"At the left-hand airline counter under the 'AB AIRLINE' sign, the two staff behave informally. They wear Hawaiian-style shirts: the left one patterned with palm trees, the right one with flowers.\"\n    },\n    {\n      \"startMs\": 34520,\n      \"endMs\": 35000,\n      \"kind\": \"visual\",\n      \"claim\": \"The casual staff member with the floral shirt at the left podium raises his hand and waves, the informal behavior singled out in the question.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-18T06:23:55.705814Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "finalReasoningEffort": "high",
+    "indexSha256": "85b941da28fd678a53c240dffc06eaf8f840fac791482758c9e13deba0eb718d",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 75.59,
+    "predicted": "A",
+    "questionId": "video-mme-010-2",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1906,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1719
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 10687,
+      "prompt_tokens": 11071,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 12977
+    },
+    "valid_format": true
   }
 ]
