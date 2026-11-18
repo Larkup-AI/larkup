@@ -1,5 +1,13 @@
 # @larkup/workspace-server
 
+## 0.2.73
+
+### Patch Changes
+
+- 69dab8c: Preserve source-timestamped visual states and incomplete coverage through the chat host boundary. Never confirm an observation whose reader explicitly reports incomplete coverage.
+- Updated dependencies [69dab8c]
+  - @larkup/marketplace@0.3.16
+
 ## 0.2.72
 
 ### Patch Changes

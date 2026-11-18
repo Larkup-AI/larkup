@@ -1,5 +1,13 @@
 # larkup
 
+## 0.5.10
+
+### Patch Changes
+
+- Updated dependencies [69dab8c]
+  - @larkup/marketplace@0.3.16
+  - @larkup/workspace-server@0.2.73
+
 ## 0.5.9
 
 ### Patch Changes
