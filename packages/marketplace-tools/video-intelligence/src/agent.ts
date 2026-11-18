@@ -82,10 +82,17 @@ export const AGENT_TOOLS = [
           additionalProperties: false,
           required: ['scope', 'goal'],
           properties: {
-            scope: { type: 'string', enum: ['focused', 'temporal', 'source'] },
+            scope: {
+              type: 'string',
+              enum: ['focused', 'temporal', 'source'],
+              description:
+                'Search one moment, compare moments, or search the whole source. Source scope alone does not request an exhaustive inventory.',
+            },
             goal: {
               type: 'string',
               enum: ['answer', 'compare', 'trace', 'resolve', 'enumerate', 'synthesize'],
+              description:
+                'Use compare for changes between observed states, resolve for a missing specific fact, enumerate for a complete inventory, and synthesize for an overall topic or summary.',
             },
             evidence: {
               type: 'array',
@@ -183,7 +190,11 @@ export function attachVideoIntelligenceAgentClient(
         // Requests that span a whole recording need deterministic pagination
         // through the index. Callers should not need to know this tool's query
         // planner well enough to opt into exhaustive retrieval themselves.
-        exhaustive: input.exhaustive ?? plan.requiresBroadCoverage === true,
+        exhaustive:
+          input.exhaustive ??
+          (plan.requiresBroadCoverage === true &&
+            directive.goal !== 'resolve' &&
+            directive.goal !== 'compare'),
       };
       const durationSecs = asset.durationSecs;
       // The compact aggregate is revision-cached and carries protocol-backed
@@ -406,7 +417,11 @@ export function attachVideoIntelligenceAgentClient(
           durationSecs,
           investigation,
           locatedRanges,
-        );
+        ).map((range) => ({
+          ...range,
+          // Aggregate records may span the source; an interactive read never does.
+          endSecs: Math.min(range.endSecs, range.startSecs + MAX_INSPECTION_CHUNK_SECS),
+        }));
         // Re-reading the source directly is the cheap way to settle this, so it
         // goes first. Dispatching a re-index below costs minutes on a cold
         // worker and frequently outlives the turn, which is what turns an
@@ -438,8 +453,11 @@ export function attachVideoIntelligenceAgentClient(
             (reading) => !('error' in reading && reading.error) && reading.found.trim(),
           );
           const paired = plan.requiresBothRanges && observed.length >= 2;
-          if (established.length > 0 || paired) {
-            const returnedReadings = paired ? observed : established;
+          const partial =
+            (plan.investigation?.goal === 'resolve' || plan.investigation?.goal === 'compare') &&
+            observed.length > 0;
+          if (established.length > 0 || paired || partial) {
+            const returnedReadings = paired || partial ? observed : established;
             const supportingClip = returnedReadings[0].range;
             const observedSubjects = observedSubjectsForAnswer(
               aggregate,
@@ -472,7 +490,7 @@ export function attachVideoIntelligenceAgentClient(
                 readings: returnedReadings,
                 rule:
                   (established.length === 0
-                    ? 'No individual reading settles the full comparison. Combine only the observed states, and keep missing subjects or attributes unresolved. '
+                    ? 'No individual reading settles the full request. Combine only observed facts, and keep missing subjects or attributes unresolved. '
                     : '') +
                   'These are direct readings taken by re-watching the source just now, for this ' +
                   'question. Answer from them and cite the timestamps they came from, and do not ' +
@@ -494,7 +512,7 @@ export function attachVideoIntelligenceAgentClient(
                 rule:
                   established.length > 0
                     ? 'The source was re-watched for this question; answer from what it established.'
-                    : 'These are complementary observations from separate source windows. Compare only their observed states; no individual window established the full relationship. State any remaining gap.',
+                    : 'These are partial direct observations. Use only their observed facts; no reading established the full requested claim. State any remaining gap.',
               },
               investigation: {
                 answerPath: 'rag+rewatch',
@@ -657,7 +675,12 @@ function windowObjective(plan: VideoPlan): string | undefined {
   if (plan.investigation?.goal === 'compare') {
     return (
       'For each requested state or label visible in this window, record the requested subject and property at that time. ' +
+      'List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. ' +
+      'Include later appearances of the same grounded subject instead of stopping at the first similar appearance. ' +
       'Record a visible state even when the other comparison state lies outside this window. ' +
+      'Keep the subject binding grounded in source continuity or independently established identity. ' +
+      'The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. ' +
+      'Describe the later state as visibly shown even if the question uses an imprecise object category. ' +
       'Separate what is visible here from any unobserved transition, and never substitute a different subject.'
     );
   }
@@ -1167,10 +1190,15 @@ function assessEvidence(
   investigation: VideoInvestigation,
   watched: WatchedRanges = { ranges: [], since: '' },
 ): EvidenceAssessment {
+  // Source scope can mean searching everywhere for one missing detail.
+  // Indexed coverage does not establish that detail or a requested comparison.
+  const detailUnresolved =
+    plan.investigation?.goal === 'resolve' || plan.investigation?.goal === 'compare';
   const needsBreadth =
-    plan.requiresBroadCoverage === true ||
-    plan.kinds.includes('coverage') ||
-    plan.kinds.includes('state-change');
+    !detailUnresolved &&
+    (plan.requiresBroadCoverage === true ||
+      plan.kinds.includes('coverage') ||
+      plan.kinds.includes('state-change'));
   const usable = hits.filter(
     (hit) =>
       !(hit as { conflict?: boolean }).conflict &&
@@ -1931,7 +1959,8 @@ function inspectionTargets(
   // closing moments often resemble it least -- they may show a result with
   // none of the question's words. Putting the ending first is what the word
   // "conclusion" means for any recording, not a fact about its subject.
-  const closing = plan.kinds.includes('outcome') ? closingRanges(durationSecs) : [];
+  const seeksClosing = plan.kinds.includes('outcome') && plan.investigation?.goal !== 'resolve';
+  const closing = seeksClosing ? closingRanges(durationSecs) : [];
   // A question about how something changed is answered at the moments it
   // changed, and the index already recorded where those are. Aiming there beats
   // an even spread, which lands between the transitions and reports the states
@@ -1939,7 +1968,7 @@ function inspectionTargets(
   const transitions = plan.kinds.includes('state-change')
     ? // An account of the whole progression needs every moment it moved.
       outcomeTransitionRanges(hits, durationSecs, { limit: budget, lateOnly: false })
-    : plan.kinds.includes('outcome')
+    : seeksClosing
       ? outcomeTransitionRanges(hits, durationSecs, { limit: 1 })
       : [];
   // For a conclusion, a located window inside the closing phase beats the
@@ -1982,7 +2011,7 @@ function inspectionTargets(
           }))
       : [];
   const locatedFirst =
-    plan.kinds.includes('outcome') && phase
+    seeksClosing && phase
       ? [
           ...closing.slice(0, 1),
           ...transitions,

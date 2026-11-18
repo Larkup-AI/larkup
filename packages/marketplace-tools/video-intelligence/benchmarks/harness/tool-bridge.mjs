@@ -144,7 +144,7 @@ export async function execute(input) {
         query: input.question.question, ...(input.investigation ? { investigation: input.investigation } : {}),
         limit: 48, ...(cursor !== undefined ? { cursor } : {}) }, context);
     }, { maxPages: input.protocol.maxEvidencePages ?? 64 });
-    if (actions.some((action) => action.action === 'canonicalReWatchFailed')) return { ...collected, success: false, toolExecutionValid: false, error: 'Canonical re-watch incomplete; reconcile saved requests before retry.', actions };
+    if (actions.some((action) => action.action === 'canonicalReWatchFailed' && action.outcomeRequiresReconciliation)) return { ...collected, success: false, toolExecutionValid: false, error: 'Canonical re-watch incomplete; reconcile saved requests before retry.', actions };
     if (actions.some((action) => action.action === 'inspectionFailed' || action.action === 'inspectionPending' || (action.action === 'inspectionReadbackUnavailable' && !readbackCompleted))) {
       return { ...collected, success: false, toolExecutionValid: false, actions };
     }

@@ -3,6 +3,11 @@ import { cachedRewatchModel } from './paid-rewatch-cache.mjs';
 import { quickLook } from '../../../../workspace-server/src/lib/media/video/quick-look.ts';
 import { createChatModel } from '../../../../workspace-server/src/lib/chat/model-provider.ts';
 
+export function rewatchOutcomeRequiresReconciliation(findings) {
+  return findings.some((finding) => finding.error &&
+    !/^(?:No frames could be read from this range\.|BENCHMARK_REWATCH_CALL_LIMIT$|ffmpeg failed \()/.test(finding.error));
+}
+
 /** Reuse the canonical local re-watch, with explicit PC-only credentials and paid fences. */
 export function benchmarkReWatch(input, raw, actions) {
   const apiKey = process.env.BENCHMARK_REWATCH_GATEWAY_KEY;
@@ -23,7 +28,7 @@ export function benchmarkReWatch(input, raw, actions) {
       transcriptFor: (range) => (raw.transcript || []).filter((s) => s.endMs >= range.startSecs * 1000 && s.startMs <= range.endSecs * 1000).map((s) => s.text).join(' ').slice(0, 4000),
       signal: AbortSignal.timeout(configuredTimeout ?? Math.max(1000, Math.min(40000, options.maxWaitMs || 12000))),
     });
-    if (findings.some((f) => f.error)) actions.push({ action: 'canonicalReWatchFailed', outcomeRequiresReconciliation: true });
+    if (findings.some((f) => f.error)) actions.push({ action: 'canonicalReWatchFailed', outcomeRequiresReconciliation: rewatchOutcomeRequiresReconciliation(findings) });
     actions.push({ action: 'canonicalReWatchConsumed', completed: findings.filter((f) => !f.error).length,
       established: findings.filter((f) => f.settlesQuestion).length });
     return findings;

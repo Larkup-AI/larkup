@@ -77,14 +77,20 @@ function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn('ffmpeg', args, { shell: false });
     let stderr = '';
-    const timeout = setTimeout(() => child.kill('SIGTERM'), EXTRACT_TIMEOUT_MS);
+    let forcedStop: ReturnType<typeof setTimeout> | undefined;
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      forcedStop = setTimeout(() => child.kill('SIGKILL'), 1_000);
+    }, EXTRACT_TIMEOUT_MS);
     child.stderr.on('data', (data) => (stderr += String(data)));
     child.on('error', (error) => {
       clearTimeout(timeout);
+      clearTimeout(forcedStop);
       reject(error);
     });
     child.on('close', (code) => {
       clearTimeout(timeout);
+      clearTimeout(forcedStop);
       if (code === 0) resolve();
       else reject(new Error(`ffmpeg failed (${code}): ${stderr.trim().slice(0, 300)}`));
     });
@@ -250,6 +256,9 @@ async function lookAtRange(input: {
 
     const { text, usage } = await generateText({
       model: input.model as Parameters<typeof generateText>[0]['model'],
+      // This pass reports bounded observations; synthesis belongs to the answer model.
+      maxOutputTokens: 2048,
+      reasoning: 'low',
       maxRetries: input.maxRetries ?? 2,
       abortSignal: input.signal,
       messages: [{ role: 'user', content: content as never }],
