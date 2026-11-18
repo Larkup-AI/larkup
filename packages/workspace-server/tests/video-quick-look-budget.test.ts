@@ -1,7 +1,9 @@
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import childProcess from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { syncBuiltinESMExports } from 'node:module';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { MockLanguageModelV4 } from 'ai/test';
@@ -12,18 +14,27 @@ test('bounded visual reading limits generation and preserves observed facts', as
   const directory = await mkdtemp(path.join(tmpdir(), 'video-reading-budget-'));
   try {
     const media = path.join(directory, 'fixture.mp4');
-    execFileSync('ffmpeg', [
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-f',
-      'lavfi',
-      '-i',
-      'color=c=blue:s=64x48:d=1',
-      '-pix_fmt',
-      'yuv420p',
-      media,
-    ]);
+    await writeFile(media, 'decoder fixture');
+    mock.method(childProcess, 'spawn', (command: string, args: string[]) => {
+      assert.equal(command, 'ffmpeg');
+      const child = Object.assign(new EventEmitter(), {
+        stderr: new EventEmitter(),
+        kill: () => true,
+      });
+      queueMicrotask(async () => {
+        try {
+          await writeFile(
+            args.at(-1)!.replace('%04d', '0001'),
+            Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+          );
+          child.emit('close', 0);
+        } catch (error) {
+          child.emit('error', error);
+        }
+      });
+      return child as any;
+    });
+    syncBuiltinESMExports();
     const model = new MockLanguageModelV4({
       doGenerate: async (options) => {
         assert.equal(options.reasoning, 'low');
@@ -77,6 +88,8 @@ test('bounded visual reading limits generation and preserves observed facts', as
     assert.equal(findings[0].settlesQuestion, true);
     assert.ok(findings[0].frameCount > 0);
   } finally {
+    mock.restoreAll();
+    syncBuiltinESMExports();
     await rm(directory, { recursive: true, force: true });
   }
 });
