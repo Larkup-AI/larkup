@@ -1,5 +1,12 @@
 # larkup
 
+## 0.5.8
+
+### Patch Changes
+
+- Updated dependencies [ae767db]
+  - @larkup/workspace-server@0.2.71
+
 ## 0.5.7
 
 ### Patch Changes
