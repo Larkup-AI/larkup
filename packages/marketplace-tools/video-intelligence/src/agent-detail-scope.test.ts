@@ -119,7 +119,7 @@ describe('healthy but incomplete direct readings', () => {
                 found: 'The requested badge is visible but its lettering is occluded.',
                 read: [],
                 confidence: 'high',
-                settlesQuestion: false,
+                settlesQuestion: true,
                 coverageComplete: false,
               },
             ],

@@ -91,6 +91,7 @@ import {
 import { hasVideoIntelligenceCapacity } from '../../../lib/media/video-intelligence-adapter';
 import {
   isUsableFinding,
+  projectQuickLookFinding,
   quickLook,
   resolveQuickLookSource,
   type QuickLookFinding,
@@ -1328,14 +1329,7 @@ export async function getChatTools(context: {
                 maxWaitMs: options?.maxWaitMs,
                 knownEntities: options?.knownEntities,
               });
-              return (outcome?.findings ?? []).map((finding) => ({
-                range: finding.range,
-                at: finding.at,
-                found: finding.found,
-                read: finding.read,
-                confidence: finding.confidence,
-                settlesQuestion: finding.settlesQuestion,
-              }));
+              return (outcome?.findings ?? []).map(projectQuickLookFinding);
             };
             return projectId ? runWithProject(projectId, run) : run();
           },

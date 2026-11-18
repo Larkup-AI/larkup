@@ -136,6 +136,8 @@ export interface AgentToolExecutionContext {
         confidence: 'high' | 'medium' | 'low';
         /** True only when this reading actually settles the asked question. */
         settlesQuestion: boolean;
+        coverageComplete?: boolean;
+        states?: Array<{ atSecs: number; subject: string; observation: string }>;
       }>
     >;
     search: (

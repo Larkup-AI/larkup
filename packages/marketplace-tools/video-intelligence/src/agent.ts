@@ -457,7 +457,8 @@ export function attachVideoIntelligenceAgentClient(
             )
             .catch(() => []);
           const established = readings.filter(
-            (reading) => reading.settlesQuestion && reading.found.trim(),
+            (reading) =>
+              reading.settlesQuestion && reading.coverageComplete !== false && reading.found.trim(),
           );
           const observed = readings.filter(
             (reading) => !('error' in reading && reading.error) && reading.found.trim(),

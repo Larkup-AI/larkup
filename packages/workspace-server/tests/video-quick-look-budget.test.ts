@@ -138,3 +138,23 @@ test('observation reasoning follows advertised capabilities rather than model na
   );
   assert.equal(visualReasoningForCapabilities(undefined), 'low');
 });
+
+test('chat projection preserves distinct frame states and incomplete coverage', async () => {
+  const { projectQuickLookFinding } = await import('../src/lib/media/video/quick-look');
+  const reading = {
+    range: { startSecs: 4, endSecs: 9 },
+    at: '0:04',
+    found: 'Two distinct panels.',
+    read: [],
+    confidence: 'high' as const,
+    settlesQuestion: true,
+    coverageComplete: false,
+    states: [
+      { atSecs: 4, subject: 'left panel', observation: 'matte' },
+      { atSecs: 8, subject: 'right panel', observation: 'reflective' },
+    ],
+  };
+  const projected = projectQuickLookFinding(reading);
+  assert.deepEqual(projected.states, reading.states);
+  assert.equal(projected.coverageComplete, false);
+});

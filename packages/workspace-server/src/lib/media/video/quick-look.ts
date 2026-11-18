@@ -72,6 +72,19 @@ async function visualReasoning(
   return visualReasoningForCapabilities(descriptor?.reasoning_options);
 }
 
+export function projectQuickLookFinding(finding: QuickLookFinding) {
+  return {
+    range: finding.range,
+    at: finding.at,
+    found: finding.found,
+    read: finding.read,
+    confidence: finding.confidence,
+    settlesQuestion: finding.settlesQuestion,
+    coverageComplete: finding.coverageComplete,
+    states: finding.states,
+  };
+}
+
 export interface QuickLookState {
   atSecs: number;
   subject: string;
