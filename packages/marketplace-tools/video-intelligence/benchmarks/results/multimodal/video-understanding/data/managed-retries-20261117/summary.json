@@ -5,9 +5,9 @@
       "reader": "latest",
       "baselineCorrect": 10,
       "failedQuestions": 9,
-      "newAnswered": 7,
+      "newAnswered": 8,
       "newCorrect": 5,
-      "completedAttempts": 11,
+      "completedAttempts": 12,
       "unknownVisionRequests": 2,
       "cumulativeCorrect": 15,
       "total": 19

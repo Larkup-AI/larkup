@@ -2681,5 +2681,61 @@
       "total_tokens": 70627
     },
     "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-approved-20261118",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The supplied evidence includes the \\\"WHERE IS KATE?\\\" segment and a Kate Middleton sighting, but none of it describes the woman's coat changing color or her appearing next to a man in a black suit. Visual attribution is withheld, so the requested change cannot be established from the source.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1399098,\n      \"endMs\": 1409008,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled event: Segment teases royal coverage with 'WHERE IS KATE?'\"\n    },\n    {\n      \"startMs\": 1416649,\n      \"endMs\": 1425357,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled visible subject: Kate Middleton\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T05:20:51.666344Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bb23e4a700ac9b6463e97e235b5937356e641e38df2ee5530bc72c62bb63152e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 62.52,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1491,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1307
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 37392,
+      "prompt_tokens": 37776,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 39267
+    },
+    "valid_format": false
   }
 ]

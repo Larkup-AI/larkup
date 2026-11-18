@@ -1,0 +1,134 @@
+{
+  "approvalId": "approved-kate-20261118",
+  "questionId": "longvideobench-Fw1rirubXiU_1",
+  "reader": "latest",
+  "authorization": "User explicitly authorized a fresh attempt despite possible charges for the two earlier unknown requests.",
+  "userReply": "آه، أعد المحاولة وسجّل احتمال تكرار الرسوم",
+  "priorUnknownRequests": [
+    {
+      "reader": "latest",
+      "questionId": "longvideobench-Fw1rirubXiU_1",
+      "model": "google/gemini-3.8-flash",
+      "submittedAt": "2026-11-17T20:29:39.205Z",
+      "fingerprint": "248643de03bda7868fbf0404f26d46a6d0046eeafe989a0bb9b590dede3be720",
+      "state": "provider-outcome-unknown",
+      "policy": "Retain receipt; do not replay automatically."
+    },
+    {
+      "reader": "latest",
+      "questionId": "longvideobench-Fw1rirubXiU_1",
+      "model": "google/gemini-3.8-flash",
+      "submittedAt": "2026-11-17T20:29:39.168Z",
+      "fingerprint": "2782b4cd679c8ca14d3b7accf25c7c9d4b01a45c1a76e5ec53a46ea860d55d0d",
+      "state": "provider-outcome-unknown",
+      "policy": "Retain receipt; do not replay automatically."
+    }
+  ],
+  "priorOutcomes": "Two original submissions remain unknown; possible duplicate charges accepted by user.",
+  "maxNewVisionCalls": 2,
+  "rewatchTimeoutMs": 120000,
+  "scope": "Only this question and latest Gemini reader; does not authorize Qwen pilot-character replay.",
+  "planningOnlyAttempt": {
+    "condition": "managed-approved-20261118",
+    "correct": false,
+    "abstained": true,
+    "visionCalls": 0,
+    "explanation": "Fresh planner requested source-wide index scan; no new vision request was issued. The final answer abstained."
+  },
+  "visualRetry": {
+    "condition": "managed-approved-20261118-visual",
+    "state": "incomplete-evidence-unscored",
+    "reason": "Reused original pre-timeout bounded plan. Both new vision requests completed with coverageComplete=false and settlesQuestion=false; canonical bridge requested unavailable managed fallback. No final synthesized answer from this inspection was scored.",
+    "newRequests": [
+      {
+        "fingerprint": "2782b4cd679c8ca14d3b7accf25c7c9d4b01a45c1a76e5ec53a46ea860d55d0d",
+        "state": "completed",
+        "model": "google/gemini-3.8-flash",
+        "findings": [
+          "```json\n{\"settlesQuestion\":false,\"coverageComplete\":false,\n\"found\":\"While Kate Middleton appears in a dark coat and white blouse at 26:00, she is shown alone. No frame shows her in that outfit standing next to a man in a black suit.\",\n\"confidence\":\"high\",\n\"read\":[\"WHERE IS KATE?\",\"Kensington Palace made it clear in January\"]}\n```"
+        ],
+        "usage": {
+          "inputTokens": {
+            "total": 18335,
+            "noCache": 18335,
+            "cacheRead": 0
+          },
+          "outputTokens": {
+            "total": 1993,
+            "text": 87,
+            "reasoning": 1906
+          },
+          "raw": {
+            "thoughtsTokenCount": 1906,
+            "promptTokenCount": 18335,
+            "candidatesTokenCount": 87,
+            "totalTokenCount": 20328,
+            "trafficType": "ON_DEMAND",
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 735
+              },
+              {
+                "modality": "IMAGE",
+                "tokenCount": 17600
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 87
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fingerprint": "3796f6cc7d012479a6ff0a76ad56f9dbc48bb0694c4943326b76d4d96f4ca255",
+        "state": "completed",
+        "model": "google/gemini-3.8-flash",
+        "findings": [
+          "```json\n{\n  \"settlesQuestion\": false,\n  \"coverageComplete\": false,\n  \"found\": \"No woman dressed in a black coat and white blouse appears in the provided frames. The visible subjects include a woman with chestnut hair in a pink dress, a blonde woman in purple, and a woman with chestnut hair in a white gown.\",\n  \"confidence\": \"high\",\n  \"read\": [\n    \"WHERE IS KATE?\",\n    \"CONSPIRACIES OVER PRINCESS KATE'S HEALTH GO VIRAL, PROMPTING RESPONSE FROM PALACE\",\n    \"KY71 HZZ\",\n    \"NBC NEWS NOW.\"\n  ]\n}\n```"
+        ],
+        "usage": {
+          "inputTokens": {
+            "total": 18335,
+            "noCache": 18335,
+            "cacheRead": 0
+          },
+          "outputTokens": {
+            "total": 726,
+            "text": 146,
+            "reasoning": 580
+          },
+          "raw": {
+            "thoughtsTokenCount": 580,
+            "promptTokenCount": 18335,
+            "candidatesTokenCount": 146,
+            "totalTokenCount": 19061,
+            "trafficType": "ON_DEMAND",
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 735
+              },
+              {
+                "modality": "IMAGE",
+                "tokenCount": 17600
+              }
+            ],
+            "candidatesTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 146
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "actualCashCostUsd": null,
+  "latestCumulativeCorrect": 15,
+  "total": 19
+}

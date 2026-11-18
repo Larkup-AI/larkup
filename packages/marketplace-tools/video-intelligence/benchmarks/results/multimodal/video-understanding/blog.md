@@ -6,7 +6,7 @@ These are **cumulative development recoveries**, not fresh full-suite accuracies
 
 | Reader | Original correct | Recovered / original failures | Cumulative correct | Distinct scorable retries |
 | --- | ---: | ---: | ---: | ---: |
-| Latest Gemini reader | 10/19 | 5/9 | 15/19 | 7 |
+| Latest Gemini reader | 10/19 | 5/9 | 15/19 | 8 |
 | Qwen 3.8 Max reader | 11/19 | 3/8 | 14/19 | 5 |
 | Muse Spark 1.3 reader | 9/19 | 6/10 | 15/19 | 7 |
 | MiniMax M3 reader | 10/19 | 4/9 | 14/19 | 7 |
@@ -53,3 +53,11 @@ Five vision requests have an unknown provider outcome: two for the latest reader
 Minimal public state is under `data/managed-retries-20261117/`: immutable baselines, completed evaluation records, the recovery summary, failure analysis, unknown-request metadata and `retry.py`. Private working attempts and provider receipts remain in the benchmark's working-state area, outside this published report. The script requires the existing ignored `benchmark.env` and checksum-matched source/index files. It filters to original failures, retains recovered passes, and refuses automatic replay of unresolved paid calls. Original historical runs are preserved.
 
 The canonical fixes were committed and pushed, with package release **0.3.20**. The existing Modal app was updated; Cloud synchronization, types, tests, lint and production build passed. Public API health and the web login route returned HTTP 200 after deployment. Production verification is recorded in `data/managed-retries-20261117/release-verification.json`. Video CI passed, but the general cross-platform gate remains unsatisfied: Linux/Windows jobs failed in unrelated workspace-server/Python tests and the macOS job was cancelled. This is a release limitation, not a green whole-repository CI result. The ECS worker was not changed. npm publication remains user-owned.
+
+## Authorized single-question follow-up — 18 November 2026
+
+The user authorized a fresh attempt on the latest reader’s coat-change question, accepting possible charges for its two previous unknown requests. Only that question and reader were revisited. A fresh DeepSeek planner chose a source-wide index scan, issued no visual requests and produced an abstention; this completed failed answer is retained in the CSV and evaluations. The original saved pre-timeout bounded inspection plan was then reused for the authorized visual replay with a 120-second standalone timeout and a maximum of two new vision requests.
+
+Both new vision requests **completed**, so this attempt did not reproduce the prior 12-second interruption. Neither reading established the requested transition: the first saw several women without matching all clothing qualifiers; the later window saw the dark-coat/white-blouse subject alone. Both returned `coverageComplete=false` and `settlesQuestion=false`. The canonical bridge requested a managed fallback unavailable in this API-only execution, leaving that visual follow-up **unscored** rather than inventing a final answer. These readings do not prove the transition is absent from the full video. The latest cumulative score therefore remains **15/19**.
+
+The two original provider outcomes remain unknown; successful new requests do not reconcile or refund them. Provider cash cost remains unknown. Approval, the preserved original receipt references, new findings and usage are recorded in `data/managed-retries-20261117/approved-retry-20261118.json`. No other failed question or previously correct answer was repeated. No product code or deployment changed in this follow-up. The separate managed-indexing and general CI limitations remain open.

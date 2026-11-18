@@ -12,7 +12,24 @@ latest,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-79f3b55b0359e
     }
   ]
 }","{""completion_tokens"": 949, ""completion_tokens_details"": {""reasoning_tokens"": 819}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 7334, ""prompt_tokens"": 7590, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 8539}",
-latest,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,E,False,,,False,unresolved baseline failure,,,0,,,,,,
+latest,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,E,True,False,,False,new failed-question retry; abstained; authorized visual follow-up unscored,deepseek-v4-pro,62.52,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The supplied evidence includes the \""WHERE IS KATE?\"" segment and a Kate Middleton sighting, but none of it describes the woman's coat changing color or her appearing next to a man in a black suit. Visual attribution is withheld, so the requested change cannot be established from the source."",
+  ""evidence"": [
+    {
+      ""startMs"": 1399098,
+      ""endMs"": 1409008,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled event: Segment teases royal coverage with 'WHERE IS KATE?'""
+    },
+    {
+      ""startMs"": 1416649,
+      ""endMs"": 1425357,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled visible subject: Kate Middleton""
+    }
+  ]
+}","{""completion_tokens"": 1491, ""completion_tokens_details"": {""reasoning_tokens"": 1307}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 37392, ""prompt_tokens"": 37776, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 39267}",
 latest,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,D,True,True,D,True,new failed-question retry,deepseek-v4-pro,30.18,3,api-rewatch,high,interactive-default,"{
   ""option"": ""D"",
   ""explanation"": ""The rewatch observation at 41:42 shows that when the screen text changes to 'GLOBAL WATCH', the anchor's right hand is raised off the desk and holding a white paper, so the change is to holding a piece of paper with his right hand."",
