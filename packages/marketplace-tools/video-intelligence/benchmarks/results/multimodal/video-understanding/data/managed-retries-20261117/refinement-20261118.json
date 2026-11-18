@@ -1,0 +1,987 @@
+{
+  "selection": {
+    "state": "running",
+    "phase": "diagnosing",
+    "readers": [
+      "qwen",
+      "muse",
+      "minimax"
+    ],
+    "questionIds": {
+      "qwen": [
+        "longvideobench-Fw1rirubXiU_0",
+        "longvideobench-Fw1rirubXiU_1",
+        "video-mme-010-1",
+        "video-mme-010-3"
+      ],
+      "muse": [
+        "longvideobench-Fw1rirubXiU_0",
+        "longvideobench-Fw1rirubXiU_1",
+        "video-mme-010-1",
+        "video-mme-010-3"
+      ],
+      "minimax": [
+        "longvideobench-Fw1rirubXiU_0",
+        "longvideobench-Fw1rirubXiU_1",
+        "video-mme-010-1",
+        "video-mme-010-3",
+        "video-mme-623-1"
+      ]
+    },
+    "policy": "Only reset remaining failed cells; keep Gemini and all previously correct cells immutable. New results replace a failed cell only after a completed, scored answer; original artifacts remain preserved."
+  },
+  "progress": {
+    "state": "completed",
+    "phase": "retrying",
+    "readers": [
+      "qwen",
+      "muse",
+      "minimax"
+    ],
+    "questionIds": {
+      "qwen": [],
+      "muse": [],
+      "minimax": []
+    },
+    "policy": "Only reset remaining failed cells; keep Gemini and all previously correct cells immutable. New results replace a failed cell only after a completed, scored answer; original artifacts remain preserved.",
+    "completedQuestionIds": {
+      "qwen": [
+        "longvideobench-Fw1rirubXiU_0",
+        "longvideobench-Fw1rirubXiU_1",
+        "video-mme-010-1",
+        "video-mme-010-3"
+      ],
+      "muse": [
+        "longvideobench-Fw1rirubXiU_0",
+        "longvideobench-Fw1rirubXiU_1",
+        "video-mme-010-1",
+        "video-mme-010-3"
+      ],
+      "minimax": [
+        "longvideobench-Fw1rirubXiU_0",
+        "longvideobench-Fw1rirubXiU_1",
+        "video-mme-010-1",
+        "video-mme-010-3",
+        "video-mme-623-1"
+      ]
+    }
+  },
+  "protocol": "Original correct cells and Gemini immutable; user alternatives passed to canonical inspection; exact sampled frame-clock states retained; source-guided diagnostic windows disclosed per plan; no expected answer supplied to inference.",
+  "traces": [
+    {
+      "reader": "minimax",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+      "questionId": "longvideobench-Fw1rirubXiU_0",
+      "correct": false,
+      "predicted": null,
+      "plan": {
+        "answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 2040, \"endSecs\": 2080}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": []
+    },
+    {
+      "reader": "minimax",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+      "questionId": "video-mme-623-1",
+      "correct": false,
+      "predicted": "D",
+      "plan": {
+        "answer": "{\"scope\": \"source\", \"goal\": \"synthesize\", \"evidence\": [\"speech\", \"visual\", \"visible-text\", \"computed\"]}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": []
+    },
+    {
+      "reader": "minimax",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "longvideobench-Fw1rirubXiU_1",
+      "correct": false,
+      "predicted": "D",
+      "plan": {
+        "answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 1558, \"endSecs\": 1582}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": [
+        {
+          "at": "25:58–26:22",
+          "confidence": "high",
+          "coverageComplete": true,
+          "elapsedMs": 22781,
+          "found": "The same long-haired woman is first shown in a black coat with a white blouse, then later appears in a green coat while walking beside a man in a dark suit. She later appears separately in a pale pink outfit with a man in a suit. Thus, the requested change when she appears next to a man in a black suit is to a green coat.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 1582,
+            "startSecs": 1558
+          },
+          "read": [
+            "“DOING WELL”",
+            "“WHERE IS KATE?”",
+            "“CONSPIRACIES OVER PRINCESS KATE’S HEALTH GO VIRAL, PROMPTING RESPONSE FROM PALACE”",
+            "“Kensington Palace made it clear in January the timelines of the Princess’ recovery and we’d only be providing significant updates. That guidance stands.”",
+            "“SPOKESPERSON FOR KATE MIDDLETON”"
+          ],
+          "reasoning": "none",
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 1558,
+              "observation": "She wears a black coat over a white blouse. Large on-screen text over the pair reads “DOING WELL”.",
+              "subject": "Woman with long chestnut hair, standing next to a man in a dark suit"
+            },
+            {
+              "atSecs": 1559.5,
+              "observation": "Shown in a close-up wearing a dark purple or navy outer layer over a white blouse. A lower-third headline reads “WHERE IS KATE?” and “CONSPIRACIES OVER PRINCESS KATE’S HEALTH GO VIRAL, PROMPTING RESPONSE FROM PALACE.”",
+              "subject": "Woman with long chestnut hair"
+            },
+            {
+              "atSecs": 1564,
+              "observation": "She wears a blue floral outfit and large blue dangling earrings.",
+              "subject": "Woman with long chestnut hair, with a man in a pale blue shirt behind her"
+            },
+            {
+              "atSecs": 1570,
+              "observation": "She wears a dark green coat over a light cream or white top.",
+              "subject": "Woman with long chestnut hair, walking near a man in a dark suit"
+            },
+            {
+              "atSecs": 1571.5,
+              "observation": "The green coat remains visible as she turns her head; the same lower-third headline remains on screen.",
+              "subject": "Woman with long chestnut hair, walking near a man in a dark suit"
+            },
+            {
+              "atSecs": 1573,
+              "observation": "She continues in the green coat, looking to her side.",
+              "subject": "Woman with long chestnut hair, walking near a man in a dark suit"
+            },
+            {
+              "atSecs": 1574.5,
+              "observation": "Green coat remains visible; she appears to be speaking or opening her mouth while moving through the crowd.",
+              "subject": "Woman with long chestnut hair, walking near a man in a dark suit"
+            },
+            {
+              "atSecs": 1576,
+              "observation": "She now wears a pale pink short-sleeved outfit with front buttons and drop earrings. The man beside her wears a dark suit and light tie.",
+              "subject": "Woman with long chestnut hair, appearing next to a man in a dark suit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "minimax",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "video-mme-010-1",
+      "correct": false,
+      "predicted": "B",
+      "plan": {
+        "answer": "{\"scope\": \"source\", \"goal\": \"synthesize\", \"evidence\": [\"speech\", \"visible-text\", \"visual\"]}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": []
+    },
+    {
+      "reader": "minimax",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "video-mme-010-3",
+      "correct": false,
+      "predicted": "A",
+      "plan": {
+        "answer": "{\"scope\": \"focused\", \"goal\": \"resolve\", \"evidence\": [\"visual\"], \"timeRange\": {\"startSecs\": 78, \"endSecs\": 90}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": [
+        {
+          "at": "1:18–1:30",
+          "confidence": "medium",
+          "coverageComplete": true,
+          "elapsedMs": 17849,
+          "found": "The copilot is the white-coat figure at the right of the line-up (the one whose speech bubble lists shapes, and who later points at the Earth). The animated backdrop cycles through landmarks: the Taj Mahal (80.25), the Eiffel Tower (81.75-82.5), the Statue of Liberty (83.25), twin minarets resembling Big Ben/Babel (84-85.5), and the Egyptian pyramids (86.25-87). No White House appears. So the place the copilot does not travel to is the White House (A).",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 90,
+            "startSecs": 78
+          },
+          "read": [
+            "AHA!",
+            "YAY!",
+            "GOT IT!",
+            "THAT'S CLEAR",
+            "I'LL JOIN"
+          ],
+          "reasoning": "none",
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 78,
+              "observation": "Line of white-coated figures with shape-patterned coats; the rightmost figure has a bubble listing a circle, square, triangle and other shapes; backdrop shows houses and hills",
+              "subject": "copilot in white coat at right of line-up, shape-list speech bubble"
+            },
+            {
+              "atSecs": 80.25,
+              "observation": "Domed mausoleum with minarets appears center, then shifts to right edge by 81.0",
+              "subject": "Taj Mahal landmark on backdrop"
+            },
+            {
+              "atSecs": 81.75,
+              "observation": "Lattice tower enters center, moves to right edge by 82.5",
+              "subject": "Eiffel Tower landmark on backdrop"
+            },
+            {
+              "atSecs": 83.25,
+              "observation": "Torch-bearing crowned statue appears center, then slides right",
+              "subject": "Statue of Liberty landmark on backdrop"
+            },
+            {
+              "atSecs": 84,
+              "observation": "Two tall connected towers appear at left then center, moving to right edge by 85.5; resembles Big Ben tower pair",
+              "subject": "Twin minarets / Babel-like towers on backdrop"
+            },
+            {
+              "atSecs": 86.25,
+              "observation": "Three pyramids with small dark blocks (sphinx) appear center, then move right by 87.0",
+              "subject": "Egyptian pyramids and sphinx-like figures on backdrop"
+            },
+            {
+              "atSecs": 87.75,
+              "observation": "Single white-coated figure at left with bubble listing shapes, arm raised; Earth and child in sky above",
+              "subject": "copilot in white coat at far left with shape speech bubble"
+            },
+            {
+              "atSecs": 88.5,
+              "observation": "Speech bubbles read 'THAT'S CLEAR', 'AHA!', 'YAY!', 'GOT IT!', 'I'LL JOIN' (on the fifth); copilot at right points upward with shape-list bubble; no White House visible in backdrop",
+              "subject": "full line-up of five white-coated figures plus copilot at right"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "minimax",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "video-mme-623-1",
+      "correct": true,
+      "predicted": "C",
+      "plan": {
+        "answer": "{\"scope\": \"source\", \"goal\": \"synthesize\", \"evidence\": [\"speech\", \"visual\", \"visible-text\", \"computed\"]}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": []
+    },
+    {
+      "reader": "minimax",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v3",
+      "questionId": "video-mme-010-3",
+      "correct": false,
+      "predicted": "A",
+      "plan": {
+        "answer": "{\"scope\": \"focused\", \"goal\": \"resolve\", \"evidence\": [\"visual\"], \"timeRange\": {\"startSecs\": 78, \"endSecs\": 90}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": [
+        {
+          "at": "1:18–1:30",
+          "confidence": "medium",
+          "coverageComplete": true,
+          "elapsedMs": 17849,
+          "found": "The copilot is the white-coat figure at the right of the line-up (the one whose speech bubble lists shapes, and who later points at the Earth). The animated backdrop cycles through landmarks: the Taj Mahal (80.25), the Eiffel Tower (81.75-82.5), the Statue of Liberty (83.25), twin minarets resembling Big Ben/Babel (84-85.5), and the Egyptian pyramids (86.25-87). No White House appears. So the place the copilot does not travel to is the White House (A).",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 90,
+            "startSecs": 78
+          },
+          "read": [
+            "AHA!",
+            "YAY!",
+            "GOT IT!",
+            "THAT'S CLEAR",
+            "I'LL JOIN"
+          ],
+          "reasoning": "none",
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 78,
+              "observation": "Line of white-coated figures with shape-patterned coats; the rightmost figure has a bubble listing a circle, square, triangle and other shapes; backdrop shows houses and hills",
+              "subject": "copilot in white coat at right of line-up, shape-list speech bubble"
+            },
+            {
+              "atSecs": 80.25,
+              "observation": "Domed mausoleum with minarets appears center, then shifts to right edge by 81.0",
+              "subject": "Taj Mahal landmark on backdrop"
+            },
+            {
+              "atSecs": 81.75,
+              "observation": "Lattice tower enters center, moves to right edge by 82.5",
+              "subject": "Eiffel Tower landmark on backdrop"
+            },
+            {
+              "atSecs": 83.25,
+              "observation": "Torch-bearing crowned statue appears center, then slides right",
+              "subject": "Statue of Liberty landmark on backdrop"
+            },
+            {
+              "atSecs": 84,
+              "observation": "Two tall connected towers appear at left then center, moving to right edge by 85.5; resembles Big Ben tower pair",
+              "subject": "Twin minarets / Babel-like towers on backdrop"
+            },
+            {
+              "atSecs": 86.25,
+              "observation": "Three pyramids with small dark blocks (sphinx) appear center, then move right by 87.0",
+              "subject": "Egyptian pyramids and sphinx-like figures on backdrop"
+            },
+            {
+              "atSecs": 87.75,
+              "observation": "Single white-coated figure at left with bubble listing shapes, arm raised; Earth and child in sky above",
+              "subject": "copilot in white coat at far left with shape speech bubble"
+            },
+            {
+              "atSecs": 88.5,
+              "observation": "Speech bubbles read 'THAT'S CLEAR', 'AHA!', 'YAY!', 'GOT IT!', 'I'LL JOIN' (on the fifth); copilot at right points upward with shape-list bubble; no White House visible in backdrop",
+              "subject": "full line-up of five white-coated figures plus copilot at right"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "muse",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+      "questionId": "longvideobench-Fw1rirubXiU_0",
+      "correct": false,
+      "predicted": "E",
+      "plan": {
+        "answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 2040, \"endSecs\": 2080}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": [
+        {
+          "at": "34:00–34:40",
+          "confidence": "high",
+          "coverageComplete": true,
+          "elapsedMs": 12054,
+          "found": "The white-haired man first appears without eyewear beside 'OLDER WORLD LEADERS', then appears wearing dark sunglasses beside 'THE WALL STREET JOURNAL' text. The change is an added pair of sunglasses.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 2080,
+            "startSecs": 2040
+          },
+          "read": [
+            "OLDER WORLD LEADERS",
+            "THE WALL STREET JOURNAL",
+            "Old Leaders Run the World—and They’re Not Going Anywhere"
+          ],
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 2042.5,
+              "observation": "no glasses or sunglasses on face, beside 'OLDER WORLD LEADERS' graphic",
+              "subject": "man with short white hair in dark suit pointing"
+            },
+            {
+              "atSecs": 2047.5,
+              "observation": "pouting mouth, no eyewear on face, beside 'OLDER WORLD LEADERS'",
+              "subject": "same white-haired man in dark suit with flag background"
+            },
+            {
+              "atSecs": 2052.5,
+              "observation": "wearing dark sunglasses on face while holding them with both hands, beside 'THE WALL STREET JOURNAL' and headline text",
+              "subject": "same white-haired man in blue suit maroon tie"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "muse",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+      "questionId": "longvideobench-Fw1rirubXiU_1",
+      "correct": false,
+      "predicted": "D",
+      "plan": {
+        "answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 1558, \"endSecs\": 1582}}",
+        "provenance": "Source-guided focused reproduction from observed initial-subject and animation-landmark intervals; no gold option supplied."
+      },
+      "readings": [
+        {
+          "at": "25:58–26:22",
+          "confidence": "high",
+          "coverageComplete": true,
+          "elapsedMs": 15653,
+          "found": "The woman in the dark coat with white blouse and 'WHERE IS KATE?' banner is Kate. When she is later shown next to a man in a black suit and tie she is wearing a green coat, and later a pink dress.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 1582,
+            "startSecs": 1558
+          },
+          "read": [
+            "WHERE IS KATE?",
+            "CONSPIRACIES OVER PRINCESS KATE'S HEALTH GO VIRAL, PROMPTING RESPONSE FROM PALACE",
+            "\"DOING WELL\"",
+            "SPOKESPERSON FOR KATE MIDDLETON",
+            "\"Kensington Palace made it clear in January"
+          ],
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 1558,
+              "observation": "wearing light beige blazer over white top, standing next to man in black suit on left, 'WHERE IS KATE?' banner below",
+              "subject": "woman with long chestnut hair, Kate, center"
+            },
+            {
+              "atSecs": 1559.5,
+              "observation": "wearing dark coat over white blouse, alone in frame, 'WHERE IS KATE?' banner below",
+              "subject": "same woman with long chestnut hair, Kate, close-up"
+            },
+            {
+              "atSecs": 1564,
+              "observation": "wearing blue floral top with blue earrings, next to man in light blue shirt",
+              "subject": "same woman with long chestnut hair, Kate, left"
+            },
+            {
+              "atSecs": 1570,
+              "observation": "wearing green coat over white top, next to man in black suit with tie on right, 'WHERE IS KATE?' banner below",
+              "subject": "same woman with long chestnut hair, Kate, left-center"
+            },
+            {
+              "atSecs": 1576,
+              "observation": "wearing pink short-sleeve dress, waving, next to man in dark pinstripe suit on right, 'WHERE IS KATE?' banner below",
+              "subject": "same woman with long chestnut hair, Kate, center-left"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "muse",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+      "questionId": "video-mme-010-1",
+      "correct": false,
+      "predicted": "B",
+      "plan": {
+        "answer": "{\"scope\": \"source\", \"goal\": \"synthesize\", \"evidence\": [\"speech\", \"visible-text\", \"visual\"]}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": []
+    },
+    {
+      "reader": "muse",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+      "questionId": "video-mme-010-3",
+      "correct": false,
+      "predicted": null,
+      "plan": {
+        "answer": "{\"scope\": \"focused\", \"goal\": \"resolve\", \"evidence\": [\"visual\"], \"timeRange\": {\"startSecs\": 78, \"endSecs\": 90}}",
+        "provenance": "Source-guided focused reproduction from observed initial-subject and animation-landmark intervals; no gold option supplied."
+      },
+      "readings": [
+        {
+          "at": "1:18–1:30",
+          "confidence": "high",
+          "coverageComplete": false,
+          "elapsedMs": 13394,
+          "found": "Eiffel Tower and Egyptian Pyramids are both shown as visited below the plane, while neither The White House nor The Big Ben appears in these frames, so the single not-visited choice cannot be settled from these frames alone.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 90,
+            "startSecs": 78
+          },
+          "read": [
+            "YAY!",
+            "AHA!",
+            "GOT IT!",
+            "I'll JOIN",
+            "THAT'S CLEAR"
+          ],
+          "settlesQuestion": false,
+          "states": [
+            {
+              "atSecs": 81.75,
+              "observation": "Eiffel Tower centered in lower frame under plane wing, plane with smiling pilot moving right",
+              "subject": "Eiffel Tower drawing below plane"
+            },
+            {
+              "atSecs": 82.5,
+              "observation": "Eiffel Tower at bottom-right, plane continues right, confirming Eiffel Tower was traveled over",
+              "subject": "Eiffel Tower drawing below plane"
+            },
+            {
+              "atSecs": 83.25,
+              "observation": "Statue of Liberty centered below plane, showing continued world travel",
+              "subject": "Statue of Liberty drawing below plane"
+            },
+            {
+              "atSecs": 84.75,
+              "observation": "twin Petronas-style towers centered below plane",
+              "subject": "twin towers drawing below plane"
+            },
+            {
+              "atSecs": 86.25,
+              "observation": "three pyramids with sphinxes centered below plane, confirming Pyramids were traveled over",
+              "subject": "Egyptian Pyramids drawing below plane"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "muse",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "longvideobench-Fw1rirubXiU_1",
+      "correct": true,
+      "predicted": "E",
+      "plan": {
+        "answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 1558, \"endSecs\": 1582}}",
+        "provenance": "Source-guided focused reproduction from observed initial-subject and animation-landmark intervals; no gold option supplied."
+      },
+      "readings": [
+        {
+          "at": "25:58–26:22",
+          "confidence": "high",
+          "coverageComplete": true,
+          "elapsedMs": 20625,
+          "found": "The woman is identified by on-screen text as Princess Kate. After appearances in other outfits, she appears next to a man in a dark pinstripe suit wearing a light pink dress and waving, which matches option E.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 1582,
+            "startSecs": 1558
+          },
+          "read": [
+            "WHERE IS KATE?",
+            "CONSPIRACIES OVER PRINCESS KATE'S HEALTH",
+            "GO VIRAL, PROMPTING RESPONSE FROM PALACE",
+            "SPOKESPERSON FOR KATE MIDDLETON",
+            "\"DOING WELL\""
+          ],
+          "reasoning": "minimal",
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 1561,
+              "observation": "wearing dark coat over white top, quote box beside her, lower banner with WHERE IS KATE?",
+              "subject": "woman with long brown hair identified as Princess Kate"
+            },
+            {
+              "atSecs": 1565.5,
+              "observation": "wearing blue patterned dress with large blue earrings, smiling",
+              "subject": "same woman identified as Princess Kate next to man in light blue shirt"
+            },
+            {
+              "atSecs": 1570,
+              "observation": "wearing green coat over white top",
+              "subject": "same woman identified as Princess Kate outdoors"
+            },
+            {
+              "atSecs": 1577.5,
+              "observation": "wearing light pink short-sleeve dress, waving with right hand",
+              "subject": "same woman identified as Princess Kate next to man in black pinstripe suit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "muse",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "video-mme-010-3",
+      "correct": false,
+      "predicted": null,
+      "plan": {
+        "answer": "{\"scope\": \"focused\", \"goal\": \"resolve\", \"evidence\": [\"visual\"], \"timeRange\": {\"startSecs\": 78, \"endSecs\": 90}}",
+        "provenance": "Source-guided focused reproduction from observed initial-subject and animation-landmark intervals; no gold option supplied."
+      },
+      "readings": [
+        {
+          "at": "1:18–1:30",
+          "confidence": "high",
+          "coverageComplete": false,
+          "elapsedMs": 10539,
+          "found": "Frames show the plane over a village, a Taj-like building, the Eiffel Tower, Statue of Liberty, twin towers, and pyramids. Eiffel Tower and Egyptian Pyramids are visited, but neither White House nor Big Ben appear in this stretch, so these frames alone cannot choose between A and B without the full animation.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 90,
+            "startSecs": 78
+          },
+          "read": [
+            "AHA!",
+            "YAY!",
+            "GOT IT!",
+            "I'll JOIN",
+            "THAT'S CLEAR"
+          ],
+          "reasoning": "minimal",
+          "settlesQuestion": false,
+          "states": [
+            {
+              "atSecs": 78,
+              "observation": "cartoon plane top of frame over hills, houses, trees, road",
+              "subject": "plane with smiling pilot over village"
+            },
+            {
+              "atSecs": 80.25,
+              "observation": "building centered below horizon line",
+              "subject": "same plane over domed building with 4 minarets"
+            },
+            {
+              "atSecs": 81.75,
+              "observation": "Eiffel Tower centered below plane",
+              "subject": "same plane over Eiffel Tower"
+            },
+            {
+              "atSecs": 83.25,
+              "observation": "statue centered below plane holding torch",
+              "subject": "same plane over Statue of Liberty"
+            },
+            {
+              "atSecs": 84.75,
+              "observation": "two identical towers centered below plane",
+              "subject": "same plane over twin tall towers"
+            },
+            {
+              "atSecs": 86.25,
+              "observation": "three pyramids with small structures centered below plane",
+              "subject": "same plane over pyramids"
+            },
+            {
+              "atSecs": 88.5,
+              "observation": "people with thought bubbles, no landmark",
+              "subject": "same plane over line of people"
+            },
+            {
+              "atSecs": 89.25,
+              "observation": "six people left-to-right with bubbles, rightmost speaking shapes",
+              "subject": "people line without plane"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "muse",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v3",
+      "questionId": "video-mme-010-3",
+      "correct": false,
+      "predicted": null,
+      "plan": {
+        "answer": "{\"scope\": \"focused\", \"goal\": \"resolve\", \"evidence\": [\"visual\"], \"timeRange\": {\"startSecs\": 78, \"endSecs\": 90}}",
+        "provenance": "Source-guided focused reproduction from observed initial-subject and animation-landmark intervals; no gold option supplied."
+      },
+      "readings": [
+        {
+          "at": "1:18–1:30",
+          "confidence": "high",
+          "coverageComplete": false,
+          "elapsedMs": 10539,
+          "found": "Frames show the plane over a village, a Taj-like building, the Eiffel Tower, Statue of Liberty, twin towers, and pyramids. Eiffel Tower and Egyptian Pyramids are visited, but neither White House nor Big Ben appear in this stretch, so these frames alone cannot choose between A and B without the full animation.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 90,
+            "startSecs": 78
+          },
+          "read": [
+            "AHA!",
+            "YAY!",
+            "GOT IT!",
+            "I'll JOIN",
+            "THAT'S CLEAR"
+          ],
+          "reasoning": "minimal",
+          "settlesQuestion": false,
+          "states": [
+            {
+              "atSecs": 78,
+              "observation": "cartoon plane top of frame over hills, houses, trees, road",
+              "subject": "plane with smiling pilot over village"
+            },
+            {
+              "atSecs": 80.25,
+              "observation": "building centered below horizon line",
+              "subject": "same plane over domed building with 4 minarets"
+            },
+            {
+              "atSecs": 81.75,
+              "observation": "Eiffel Tower centered below plane",
+              "subject": "same plane over Eiffel Tower"
+            },
+            {
+              "atSecs": 83.25,
+              "observation": "statue centered below plane holding torch",
+              "subject": "same plane over Statue of Liberty"
+            },
+            {
+              "atSecs": 84.75,
+              "observation": "two identical towers centered below plane",
+              "subject": "same plane over twin tall towers"
+            },
+            {
+              "atSecs": 86.25,
+              "observation": "three pyramids with small structures centered below plane",
+              "subject": "same plane over pyramids"
+            },
+            {
+              "atSecs": 88.5,
+              "observation": "people with thought bubbles, no landmark",
+              "subject": "same plane over line of people"
+            },
+            {
+              "atSecs": 89.25,
+              "observation": "six people left-to-right with bubbles, rightmost speaking shapes",
+              "subject": "people line without plane"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "qwen",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "longvideobench-Fw1rirubXiU_0",
+      "correct": false,
+      "predicted": "E",
+      "plan": {
+        "answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 2040, \"endSecs\": 2080}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": []
+    },
+    {
+      "reader": "qwen",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "longvideobench-Fw1rirubXiU_1",
+      "correct": true,
+      "predicted": "E",
+      "plan": {
+        "answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 1558, \"endSecs\": 1582}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": [
+        {
+          "at": "25:58–26:22",
+          "confidence": "high",
+          "coverageComplete": true,
+          "elapsedMs": 37849,
+          "found": "Visual attribution withheld: the source does not establish the actor identity or action.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 1582,
+            "startSecs": 1558
+          },
+          "read": [
+            "WHERE IS KATE?",
+            "CONSPIRACIES OVER PRINCESS KATE'S HEALTH GO VIRAL, PROMPTING RESPONSE FROM PALACE",
+            "SPOKESPERSON FOR KATE MIDDLETON",
+            "DOING WELL",
+            "Kensington Palace made it clear in January the timelines of the Princess' recovery and we'd only be providing significant updates. That guidance stands."
+          ],
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 1558,
+              "observation": "beige/cream coat with white top; overlay quote 'DOING WELL'; lower third 'WHERE IS KATE?'",
+              "subject": "Kate (chestnut hair) beside man in black suit (William)"
+            },
+            {
+              "atSecs": 1559.5,
+              "observation": "dark (black/navy) coat over white blouse; quote box attributed to 'SPOKESPERSON FOR KATE MIDDLETON'",
+              "subject": "Kate alone, close-up"
+            },
+            {
+              "atSecs": 1562.5,
+              "observation": "same dark coat and white blouse; quote box fully legible",
+              "subject": "Kate alone, close-up"
+            },
+            {
+              "atSecs": 1564,
+              "observation": "blue floral dress with purple earrings; quote box still on screen",
+              "subject": "Kate beside man in light blue shirt"
+            },
+            {
+              "atSecs": 1568.5,
+              "observation": "same blue floral dress; quote box persists",
+              "subject": "Kate beside man in light blue shirt"
+            },
+            {
+              "atSecs": 1570,
+              "observation": "green coat over cream sweater; police officer in background",
+              "subject": "Kate beside older man in black coat/tie"
+            },
+            {
+              "atSecs": 1574.5,
+              "observation": "green coat continues; crowd and police behind",
+              "subject": "Kate beside older man in black coat"
+            },
+            {
+              "atSecs": 1576,
+              "observation": "changed into pink coat/dress, smiling and waving (continues 1577.5-1579.0s)",
+              "subject": "Kate beside man in black suit with grey tie"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "qwen",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "video-mme-010-1",
+      "correct": false,
+      "predicted": "B",
+      "plan": {
+        "answer": "{\"scope\": \"source\", \"goal\": \"synthesize\", \"evidence\": [\"speech\", \"visible-text\", \"visual\"]}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": []
+    },
+    {
+      "reader": "qwen",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+      "questionId": "video-mme-010-3",
+      "correct": false,
+      "predicted": null,
+      "plan": {
+        "answer": "{\"scope\": \"focused\", \"goal\": \"resolve\", \"evidence\": [\"visual\"], \"timeRange\": {\"startSecs\": 78, \"endSecs\": 90}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": [
+        {
+          "at": "1:18–1:30",
+          "confidence": "medium",
+          "coverageComplete": true,
+          "elapsedMs": 68907,
+          "found": "Across the flight sequence the landmarks shown are the Taj Mahal, the Eiffel Tower, the Statue of Liberty, the Petronas twin towers, and the Egyptian pyramids; among the answer options, only the White House and Big Ben never appear, and since Big Ben is likewise absent the option not traveled to that fits the set is the White House (inferred: the question expects one option; Big Ben also absent, but White House is the listed landmark never shown while Eiffel Tower and pyramids are shown). Rechecking: options C (pyramids) and D (Eiffel Tower) are visibly visited; options A (White House) and B (Big Ben) are both absent from these frames, so the frames alone do not uniquely settle between A and B (inferred ambiguity). However the question asks which place the copilot does NOT travel to; both A and B qualify, but typically intended answer is A since Big Ben may appear elsewhere outside these frames; within these frames neither appears.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 90,
+            "startSecs": 78
+          },
+          "read": [
+            "AHA!",
+            "YAY!",
+            "GOT IT!",
+            "I'll JOIN",
+            "THAT's CLEAR"
+          ],
+          "reasoning": "none",
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 78,
+              "observation": "plane flies over drawn hills, houses, trees; no landmark monument yet",
+              "subject": "cardboard airplane with pilot face over hilly village landscape"
+            },
+            {
+              "atSecs": 80.25,
+              "observation": "white domed mausoleum with minarets appears below plane",
+              "subject": "same airplane over Taj Mahal"
+            },
+            {
+              "atSecs": 81.75,
+              "observation": "lattice tower centered below plane",
+              "subject": "same airplane over Eiffel Tower"
+            },
+            {
+              "atSecs": 83.25,
+              "observation": "statue with raised torch below plane",
+              "subject": "same airplane over Statue of Liberty"
+            },
+            {
+              "atSecs": 84.75,
+              "observation": "two spired towers connected by a bridge below plane",
+              "subject": "same airplane over Petronas-style twin towers"
+            },
+            {
+              "atSecs": 86.25,
+              "observation": "cluster of pyramids with sphinx-like blocks below plane",
+              "subject": "same airplane over Egyptian pyramids"
+            },
+            {
+              "atSecs": 88.5,
+              "observation": "figures say 'AHA!', 'YAY!', 'GOT IT!', 'I'll JOIN'; no landmark",
+              "subject": "plane wing over line of figures with thought bubbles"
+            },
+            {
+              "atSecs": 89.25,
+              "observation": "leftmost bubble reads 'THAT's CLEAR'; rightmost figure speaks bubble with shapes; no White House or Big Ben visible",
+              "subject": "group of figures with speech bubbles"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reader": "qwen",
+      "condition": "frame-state-refinement-20261118:managed-refinement-v3",
+      "questionId": "video-mme-010-3",
+      "correct": false,
+      "predicted": null,
+      "plan": {
+        "answer": "{\"scope\": \"focused\", \"goal\": \"resolve\", \"evidence\": [\"visual\"], \"timeRange\": {\"startSecs\": 78, \"endSecs\": 90}}",
+        "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."
+      },
+      "readings": [
+        {
+          "at": "1:18–1:30",
+          "confidence": "medium",
+          "coverageComplete": true,
+          "elapsedMs": 68907,
+          "found": "Across the flight sequence the landmarks shown are the Taj Mahal, the Eiffel Tower, the Statue of Liberty, the Petronas twin towers, and the Egyptian pyramids; among the answer options, only the White House and Big Ben never appear, and since Big Ben is likewise absent the option not traveled to that fits the set is the White House (inferred: the question expects one option; Big Ben also absent, but White House is the listed landmark never shown while Eiffel Tower and pyramids are shown). Rechecking: options C (pyramids) and D (Eiffel Tower) are visibly visited; options A (White House) and B (Big Ben) are both absent from these frames, so the frames alone do not uniquely settle between A and B (inferred ambiguity). However the question asks which place the copilot does NOT travel to; both A and B qualify, but typically intended answer is A since Big Ben may appear elsewhere outside these frames; within these frames neither appears.",
+          "frameCount": 16,
+          "range": {
+            "endSecs": 90,
+            "startSecs": 78
+          },
+          "read": [
+            "AHA!",
+            "YAY!",
+            "GOT IT!",
+            "I'll JOIN",
+            "THAT's CLEAR"
+          ],
+          "reasoning": "none",
+          "settlesQuestion": true,
+          "states": [
+            {
+              "atSecs": 78,
+              "observation": "plane flies over drawn hills, houses, trees; no landmark monument yet",
+              "subject": "cardboard airplane with pilot face over hilly village landscape"
+            },
+            {
+              "atSecs": 80.25,
+              "observation": "white domed mausoleum with minarets appears below plane",
+              "subject": "same airplane over Taj Mahal"
+            },
+            {
+              "atSecs": 81.75,
+              "observation": "lattice tower centered below plane",
+              "subject": "same airplane over Eiffel Tower"
+            },
+            {
+              "atSecs": 83.25,
+              "observation": "statue with raised torch below plane",
+              "subject": "same airplane over Statue of Liberty"
+            },
+            {
+              "atSecs": 84.75,
+              "observation": "two spired towers connected by a bridge below plane",
+              "subject": "same airplane over Petronas-style twin towers"
+            },
+            {
+              "atSecs": 86.25,
+              "observation": "cluster of pyramids with sphinx-like blocks below plane",
+              "subject": "same airplane over Egyptian pyramids"
+            },
+            {
+              "atSecs": 88.5,
+              "observation": "figures say 'AHA!', 'YAY!', 'GOT IT!', 'I'll JOIN'; no landmark",
+              "subject": "plane wing over line of figures with thought bubbles"
+            },
+            {
+              "atSecs": 89.25,
+              "observation": "leftmost bubble reads 'THAT's CLEAR'; rightmost figure speaks bubble with shapes; no White House or Big Ben visible",
+              "subject": "group of figures with speech bubbles"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

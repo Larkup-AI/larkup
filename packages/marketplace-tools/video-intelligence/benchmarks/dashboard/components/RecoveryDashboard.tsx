@@ -90,7 +90,9 @@ export default function RecoveryDashboard({ children }: { children: ReactNode })
       <header className="top">
         <div>
           <h1>Video Benchmark · Current results</h1>
-          <div className="sub">Failed-question recovery · DeepSeek V4 Pro answer backbone</div>
+          <div className="sub">
+            Failed-question recovery · answer configuration recorded per attempt
+          </div>
         </div>
         <strong style={{ color: data.status === 'running' ? 'var(--wait)' : 'var(--go)' }}>
           {data.status === 'running' ? 'Retrying failed questions' : 'Recovery completed'}

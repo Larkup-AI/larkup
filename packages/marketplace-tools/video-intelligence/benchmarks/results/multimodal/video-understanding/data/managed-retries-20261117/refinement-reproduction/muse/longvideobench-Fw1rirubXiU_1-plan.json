@@ -1,0 +1,1 @@
+{"answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 1558, \"endSecs\": 1582}}", "provenance": "Source-guided focused reproduction from observed initial-subject and animation-landmark intervals; no gold option supplied."}

@@ -1,15 +1,15 @@
 # Video understanding: targeted failed-question recovery
 
-17 November 2026. The latest Gemini-reader condition recovered **five of its nine original failures**, taking the requested cumulative ledger from **10/19 to 15/19**. The ten historical passes were retained and never asked again.
+Updated 18 November 2026. The latest Gemini-reader condition recovered **five of its nine original failures**, taking the requested cumulative ledger from **10/19 to 15/19**. The ten historical passes were retained and never asked again.
 
 These are **cumulative development recoveries**, not fresh full-suite accuracies or a fair new ranking of the models. Previously passing questions were not tested on the final implementation or new answer backbone. Reference options and all original 19-question denominators remain unchanged.
 
 | Reader | Original correct | Recovered / original failures | Cumulative correct | Completed failed questions |
 | --- | ---: | ---: | ---: | ---: |
 | Latest Gemini reader | 10/19 | 5/9 | 15/19 | 9/9 |
-| Qwen 3.8 Max reader | 11/19 | 4/8 | 15/19 | 8/8 |
-| Muse Spark 1.3 reader | 9/19 | 6/10 | 15/19 | 10/10 |
-| MiniMax M3 reader | 10/19 | 4/9 | 14/19 | 9/9 |
+| Qwen 3.8 Max reader | 11/19 | 5/8 | 16/19 | 8/8 |
+| Muse Spark 1.3 reader | 9/19 | 7/10 | 16/19 | 10/10 |
+| MiniMax M3 reader | 10/19 | 5/9 | 15/19 | 9/9 |
 
 The latest baseline is `run-79f3b55b0359ec26d60c`. The other readers use the completed pilot requested by the user, `run-9d45724237e86021e098`; its first and second reader phases are joined by question ID, giving exactly 19 unique questions per reader. Baseline passes remain immutable. `results.csv` records every retained or retried answer, output origin, official option, attempt count, measured standalone latency, reasoning setting, timeout and available token usage. Empty cash-cost fields mean **unknown**, not zero.
 
@@ -36,7 +36,7 @@ Source review found two strong content/reference conflicts and one ambiguous neg
 | `video-mme-010-1` | The source teaches intercultural communication and cultural intelligence, rather than rapid foreign-language mastery. | C |
 | `video-mme-010-3` | The final landmark sequence shows the Taj Mahal, Eiffel Tower, Statue of Liberty, Petronas Towers and pyramids; both the White House and Big Ben are absent from the reviewed sequence. | B |
 
-This is assistant source review, not an independent human adjudication. No disputed case is excluded from the denominator and no output is forced to match an unsupported reference. MiniMax also retains one unresolved real failure on the presentation's primary focus; an introductory title alone was insufficient, and a source-wide retry still chose the wrong official option.
+This is assistant source review, not an independent human adjudication. No disputed case is excluded from the denominator and no output is forced to match an unsupported reference. The later refinement recovered MiniMax’s primary-topic question using distributed primary evidence; earlier attempts over-weighted the introduction.
 
 ## Execution and limitations
 
@@ -77,3 +77,32 @@ The follow-up release is Video Intelligence **0.3.21** and workspace-server **0.
 A final independent **real managed Cloud/Modal acceptance** also passed: a four-second blue fixture with the centered word “VERIFYFRAME” returned both the correct background color and exact word. This was not a benchmark question and did not change any score. The uploaded source follows the control plane’s normal source cleanup. Cloud synchronization and deployment completed successfully; public API health and the web login route returned HTTP 200. The native service path is healthy on this fixture; the older source-specific blank-frame claim remains a separate limitation.
 
 Final code verification: 138 canonical video tests passed locally and on Windows, the dedicated Video Intelligence Linux workflow passed, and the new visual-budget regression passed on Linux and Windows. The whole-repository matrix remains **not green**: Linux/Windows structured-analysis tests lack pandas, Windows has an unrelated policy snapshot failure, and macOS CI was cancelled. The local server suite’s one Python matching timeout passed on its isolated retry. npm publication remains user-owned.
+
+
+## Final bounded refinement — 18 November 2026
+
+The latest requested round is complete. Only the 13 then-failed Qwen/Muse/MiniMax cells were reset. All historical successes and every Gemini cell were preserved byte for byte. Qwen and Muse each recovered the coat-change question, and MiniMax recovered the presentation-topic question: **Gemini 15/19, Qwen 16/19, Muse 16/19, MiniMax 15/19**. This is a cumulative development ledger, not a fresh cross-model ranking. The requested extra Qwen recovery to 17/19 was **not achieved**.
+
+General canonical changes preserve user-supplied answer alternatives in retrieval and inspection, retain separate visible states with validated source-frame timestamps and subject context, and use the least reasoning effort advertised by the vision provider so the bounded observation budget produces visible output. Explicit synthesis samples primary excerpts across the source and retains closing context; explicit exhaustive inventories remain exhaustive. No benchmark identifiers, answer values or expected labels enter these product rules.
+
+The coat question remains semantically ambiguous: nearby green and pink appearances both partly fit its loose qualifiers. The new readers recorded each state rather than stopping at the first similar person. The scored pink appearance is visible, but matching the reference does not establish unique subject continuity. The three shared remaining failures for Qwen and Muse are the article-reference conflict, culture-reference conflict, and ambiguous landmark negative question described above. MiniMax additionally still misses the coat question.
+
+The last Qwen-only attempt reused its existing canonical landmark evidence and used Qwen itself as final answer writer at temperature 0, reasoning none, instead of DeepSeek. It made **zero new vision calls** and completed in **10.58 seconds**. It chose A while disclosing that both A and reference B were absent in the supplied frames. This is a distinct configuration, recorded as an incorrect attempt; the official answer and denominator were not changed. No further sampling was performed to chase the reference.
+
+Diagnostic source windows were guided by source review. DeepSeek V4 Pro remained the deliberate planner/final writer for the other refinement attempts; vision used each selected hosted reader. These standalone canonical-code retries are not authenticated Cloud-chat benchmark calls. The MiniMax topic retry reduced evidence from 44 pages to one, final prompt usage from 296,823 to 13,826 tokens, and measured standalone latency from 118.6 to 58.9 seconds for this one case. This is not a general latency claim.
+
+Current dashboard recovery results are read directly from the validated CSV and summary; the old paused pilot snapshot is available separately as historical controller state. No historical pilot status was falsified. Reproduction evidence, plans, completed results, and the exact failed Qwen final prompt/hash are under `data/managed-retries-20261117/refinement-reproduction/`. `refinement-20261118.json` preserves the selected questions and observation traces. Reproduction uses the existing private keys and checksum-matched source/index files; external model outputs may vary. Paid request receipts and earlier unknown outcomes remain preserved, and cash cost remains unknown.
+
+Final local verification passed: 141 video tests, 189 workspace-server tests, package types/builds, dashboard tests/types, and benchmark adapter/answer-contract checks. Deployment evidence is maintained in `release-verification.json`; prior managed source-specific blank-frame and unrelated whole-repository CI limitations remain open. No RunPod, ECS inference or parallel video runtime was used.
+
+
+To validate the frozen last-attempt configuration without another paid request, run from the canonical checkout:
+
+```bash
+python3 packages/marketplace-tools/video-intelligence/benchmarks/results/multimodal/video-understanding/data/managed-retries-20261117/replay-answer.py \
+  --model alibaba/qwen3.8-max \
+  --prompt packages/marketplace-tools/video-intelligence/benchmarks/results/multimodal/video-understanding/data/managed-retries-20261117/refinement-reproduction/reader-answer-prompt.txt \
+  --output /tmp/new-video-answer-receipt.json --dry-run
+```
+
+Removing `--dry-run` makes one API request and refuses to overwrite an existing receipt. This frozen attempt was incorrect; it is published for reproducibility, not represented as a recovered pass. Current recovered passes and their source-bound inspection plans are in the same reproduction directory. Historical successes must not be submitted again.

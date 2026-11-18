@@ -184,36 +184,36 @@ latest,video-mme-623-2,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,False,C,A,
 }","{""completion_tokens"": 2519, ""completion_tokens_details"": {""reasoning_tokens"": 2266}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 57857, ""prompt_tokens"": 57857, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 60376}",
 latest,video-mme-623-3,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
-qwen,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,174.32,1,api-rewatch,high,120000,"{
-  ""option"": null,
-  ""explanation"": ""The only evidence related to 'THE WALL STREET JOURNAL' is a WSJ headline 'Old Leaders Run the World' displayed with a Biden photo at approximately 2041.9–2056.9s. The evidence does not describe any change to the man, such as additional glasses, a hat, sunglasses, or hair color change, so none of the options can be established."",
+qwen,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,True,False,E,False,frame-state and candidate-context refinement,deepseek-v4-pro,119.2,2,api-rewatch,high,120000,"{
+  ""option"": ""E"",
+  ""explanation"": ""At the moment the man appears next to 'THE WALL STREET JOURNAL' text, the visual evidence shows him lowering sunglasses, which is the observed change; no hat, regular glasses, or black hair is indicated."",
   ""evidence"": [
     {
       ""startMs"": 2041873,
       ""endMs"": 2056873,
-      ""kind"": ""computed"",
-      ""claim"": ""WSJ headline 'Old Leaders Run the World' displayed with Biden photo.""
+      ""kind"": ""visual"",
+      ""claim"": ""Visible: Joe Biden, a white-haired man in a photo, is shown lowering sunglasses and wearing a blue suit and maroon tie; on-screen text includes 'THE WALL STREET JOURNAL' and the WSJ headline; cut to full-screen WSJ headline graphic with Biden photo at ~2051.1s.""
     }
   ]
-}","{""completion_tokens"": 3417, ""completion_tokens_details"": {""reasoning_tokens"": 3263}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 10346, ""prompt_tokens"": 10730, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 14147}",
-qwen,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,110.32,1,api-rewatch,high,120000,"{
-  ""option"": null,
-  ""explanation"": ""The supplied evidence does not establish the woman's identity or any coat change. The targeted rewatch at 25:58–26:22 (1558–1582) reported visual attribution withheld, and the later B-roll note at ~1590.5s only describes a couple walking, without identifying a coat color change. Therefore no option can be selected."",
+}","{""completion_tokens"": 3348, ""completion_tokens_details"": {""reasoning_tokens"": 3179}, ""prompt_cache_hit_tokens"": 768, ""prompt_cache_miss_tokens"": 11373, ""prompt_tokens"": 12141, ""prompt_tokens_details"": {""cached_tokens"": 768}, ""total_tokens"": 15489}",
+qwen,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,True,True,E,True,frame-state and candidate-context refinement,deepseek-v4-pro,110.2,2,api-rewatch,high,120000,"{
+  ""option"": ""E"",
+  ""explanation"": ""At 1559.5s the woman is seen in a dark/black coat over a white blouse, matching the initial state. At 1576s she appears beside a man in a black suit and has changed into a pink coat/dress. Therefore the change is into a pink coat."",
   ""evidence"": [
     {
-      ""startMs"": 1558000,
-      ""endMs"": 1582000,
-      ""kind"": ""direct-observation"",
-      ""claim"": ""Rewatch of 1558–1582 reported visual attribution withheld; no actor identity or action established.""
+      ""startMs"": 1559500,
+      ""endMs"": 1559500,
+      ""kind"": ""visual"",
+      ""claim"": ""Kate is alone in a dark/black coat over a white blouse.""
     },
     {
-      ""startMs"": 1580512,
-      ""endMs"": 1592624,
+      ""startMs"": 1576000,
+      ""endMs"": 1576000,
       ""kind"": ""visual"",
-      ""claim"": ""Visual reading at ~1590.5 does not describe any coat color change; only a well-dressed couple walking near a grey car.""
+      ""claim"": ""Kate is beside a man in a black suit, wearing a pink coat/dress.""
     }
   ]
-}","{""completion_tokens"": 3862, ""completion_tokens_details"": {""reasoning_tokens"": 3643}, ""prompt_cache_hit_tokens"": 640, ""prompt_cache_miss_tokens"": 11765, ""prompt_tokens"": 12405, ""prompt_tokens_details"": {""cached_tokens"": 640}, ""total_tokens"": 16267}",
+}","{""completion_tokens"": 3539, ""completion_tokens_details"": {""reasoning_tokens"": 3351}, ""prompt_cache_hit_tokens"": 768, ""prompt_cache_miss_tokens"": 11945, ""prompt_tokens"": 12713, ""prompt_tokens_details"": {""cached_tokens"": 768}, ""total_tokens"": 16252}",
 qwen,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
@@ -241,30 +241,36 @@ qwen,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,Tru
 qwen,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
 qwen,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-qwen,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,completed failed-question retry,deepseek-v4-pro,13.5,1,api-rewatch,high,120000,"{
+qwen,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,frame-state and candidate-context refinement,deepseek-v4-pro,37.33,2,api-rewatch,high,120000,"{
   ""option"": ""B"",
-  ""explanation"": ""The video uses animated scenarios to illustrate how cultural perspective shapes perception, depicts cross-cultural miscommunication and workplace cultural dimensions, and ends with Dr. Deborah Swallow, identified as a leading authority on intercultural communication. Its focus is fundamentals of intercultural communication, not history, language acquisition, or political conflict."",
+  ""explanation"": ""The video provides an introduction to navigating cultural differences, supported by narration about learning to navigate cultural landscapes, on-screen cultural dimensions (Deal vs. Relationship, Direct vs. Indirect), and a title card identifying Dr. Deborah Swallow as a leading authority on intercultural communication. It does not focus on historical conflicts, foreign language mastery, or political conflict resolution."",
   ""evidence"": [
     {
-      ""startMs"": 17680,
-      ""endMs"": 25180,
-      ""kind"": ""speech"",
-      ""claim"": ""Narrator asks 'What happens when you speak?' and 'Do people from other cultures understand you in the way you intended?', introducing the theme of cross-cultural communication.""
+      ""startMs"": 24200,
+      ""endMs"": 29809,
+      ""kind"": ""transcript"",
+      ""claim"": ""Narration asks: 'And what happens with different cultures in the work place?'""
     },
     {
-      ""startMs"": 46240,
+      ""startMs"": 41020,
+      ""endMs"": 47240,
+      ""kind"": ""transcript"",
+      ""claim"": ""Narration: 'In today's global business environment, it is essential to learn to navigate across different cultural landscapes.'""
+    },
+    {
+      ""startMs"": 53080,
       ""endMs"": 65000,
       ""kind"": ""visual"",
-      ""claim"": ""A 'DIVERSITY DASHBOARD' panel presents cultural dimensions: deal orientated vs relationship orientated, direct vs indirect communication, egalitarian vs hierarchical management.""
+      ""claim"": ""On-screen cultural dimensions are shown as toggles and gauges: Deal vs. Relationship, Direct vs. Indirect, Egalitarian vs. Hierarchical.""
     },
     {
       ""startMs"": 97320,
-      ""endMs"": 115000,
-      ""kind"": ""title-card"",
-      ""claim"": ""Ending title card names Dr. Deborah Swallow as 'Speaker, Author, Consultant' and 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.""
+      ""endMs"": 104820,
+      ""kind"": ""visual"",
+      ""claim"": ""Title card identifies Dr. Deborah Swallow as 'Leading Authority on Intercultural Communication.'""
     }
   ]
-}","{""completion_tokens"": 945, ""completion_tokens_details"": {""reasoning_tokens"": 656}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 44212, ""prompt_tokens"": 44596, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 45541}",
+}","{""completion_tokens"": 1832, ""completion_tokens_details"": {""reasoning_tokens"": 1507}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 10644, ""prompt_tokens"": 11028, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 12860}",
 qwen,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,75.59,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
   ""explanation"": ""The casually dressed staff member at the left AB AIRLINE counter who waves is identified as wearing a floral shirt, matching 'A flower'."",
@@ -283,18 +289,7 @@ qwen,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,Tr
     }
   ]
 }","{""completion_tokens"": 1906, ""completion_tokens_details"": {""reasoning_tokens"": 1719}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 10687, ""prompt_tokens"": 11071, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 12977}",
-qwen,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,41.8,1,api-rewatch,high,120000,"{
-  ""option"": null,
-  ""explanation"": ""The supplied evidence only mentions the pilot flying over the Taj Mahal and Petronas-style twin towers near the end (65-88s). It does not mention the White House, Big Ben, the Egyptian Pyramids, or the Eiffel Tower, so it cannot establish which of the listed places the copilot does not travel to."",
-  ""evidence"": [
-    {
-      ""startMs"": 65000,
-      ""endMs"": 88480,
-      ""kind"": ""computed"",
-      ""claim"": ""A cut-out propeller plane with a goggled pilot flies over a city skyline, countryside, and world landmarks including the Taj Mahal and Petronas-style twin towers, representing a journey of understanding.""
-    }
-  ]
-}","{""completion_tokens"": 2996, ""completion_tokens_details"": {""reasoning_tokens"": 2827}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 43475, ""prompt_tokens"": 43859, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 46855}",
+qwen,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,A,False,Qwen synthesizes existing canonical evidence; distinct configuration,alibaba/qwen3.8-max,10.58,4,api-rewatch,none,120000,"{""option"":""A"",""explanation"":""During the flight sequence at the end of the animation, the plane visibly passes over the Taj Mahal (~80.25s), the Eiffel Tower (~81.75s), the Statue of Liberty (~83.25s), Petronas-style twin towers (~84.75s), and the Egyptian pyramids (~86.25s). The Eiffel Tower (D) and Egyptian Pyramids (C) are therefore visited. Neither the White House (A) nor Big Ben (B) appears in these frames. There is ambiguity between A and B since both are absent from the observed landmarks; however, the White House is selected as the best-supported answer given it is a listed landmark never shown while the other two options are confirmed visited."",""evidence"":[{""startMs"":80250,""endMs"":81750,""kind"":""visual"",""claim"":""White domed mausoleum with minarets (Taj Mahal) appears below the plane.""},{""startMs"":81750,""endMs"":83250,""kind"":""visual"",""claim"":""Lattice tower (Eiffel Tower) centered below the plane.""},{""startMs"":83250,""endMs"":84750,""kind"":""visual"",""claim"":""Statue with raised torch (Statue of Liberty) below the plane.""},{""startMs"":84750,""endMs"":86250,""kind"":""visual"",""claim"":""Two spired towers connected by a bridge (Petronas-style twin towers) below the plane.""},{""startMs"":86250,""endMs"":88500,""kind"":""visual"",""claim"":""Cluster of pyramids with sphinx-like blocks (Egyptian pyramids) below the plane.""},{""startMs"":88500,""endMs"":90000,""kind"":""visual"",""claim"":""Figures display thought bubbles ('AHA!', 'YAY!', 'GOT IT!', 'I'll JOIN', 'THAT's CLEAR'); no White House or Big Ben visible.""}]}","{""inputTokens"": 8352, ""inputTokenDetails"": {""noCacheTokens"": 8352, ""cacheReadTokens"": 0, ""cacheWriteTokens"": 0}, ""outputTokens"": 448, ""outputTokenDetails"": {""textTokens"": 448, ""reasoningTokens"": 0}, ""totalTokens"": 8800, ""raw"": {""prompt_tokens"": 8352, ""completion_tokens"": 448, ""total_tokens"": 8800, ""prompt_tokens_details"": {""cached_tokens"": 0, ""text_tokens"": 8352}}}",
 qwen,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,54.92,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""The presentation consistently focuses on how body fat, especially fat-cell hypertrophy, causes insulin resistance, and how insulin resistance is linked to chronic diseases such as obesity and diabetes. Early slides show Insulin Resistance as a central hub connected to Diabetes, Heart Disease, Cancer, Obesity, and other chronic conditions, and the talk asks 'How does body fat cause insulin resistance?' The overarching theme is the relationship among body fat, insulin resistance, and chronic disease, making option C the best match. Option D is too narrow because it centers only on insulin's role rather than the broader fat-cell/insulin-resistance/chronic-disease relationship."",
@@ -356,36 +351,48 @@ muse,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrec
     }
   ]
 }","{""completion_tokens"": 674, ""completion_tokens_details"": {""reasoning_tokens"": 534}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 5756, ""prompt_tokens"": 6012, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 6686}",
-muse,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,175.73,1,api-rewatch,high,120000,"{
-  ""option"": null,
-  ""explanation"": ""The supplied evidence contains a timestamped claim about a studio presenting a Wall Street Journal article with a Biden photo, but it does not describe any visual change to a man with short white hair and a pouting mouth (e.g., added glasses, hat, or hair color). No choice is source-grounded."",
+muse,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,True,False,E,False,frame-state and candidate-context refinement,deepseek-v4-pro,34.53,2,api-rewatch,high,120000,"{
+  ""option"": ""E"",
+  ""explanation"": ""At 2042.5s and 2047.5s the white-haired man has no eyewear and a pouting mouth. At 2052.5s, when he appears beside 'THE WALL STREET JOURNAL', he is wearing dark sunglasses. The change is an added pair of sunglasses."",
   ""evidence"": [
     {
-      ""startMs"": 2042440,
-      ""endMs"": 2042440,
-      ""kind"": ""computed"",
-      ""claim"": ""Reconciled event: Studio presents Wall Street Journal article 'Old Leaders Run the World' with Biden photo.""
-    }
-  ]
-}","{""completion_tokens"": 3392, ""completion_tokens_details"": {""reasoning_tokens"": 3248}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 7671, ""prompt_tokens"": 8055, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 11447}",
-muse,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,True,False,D,False,completed failed-question retry,deepseek-v4-pro,41.17,1,api-rewatch,high,120000,"{
-  ""option"": ""D"",
-  ""explanation"": ""At 25:59–26:02 the long chestnut-hair woman appears alone in a dark coat over white top with the spokesperson quote box displayed. At 26:10–26:14 she appears next to a man in a black suit/tie, now wearing a green coat. Thus the change is into a green coat."",
-  ""evidence"": [
-    {
-      ""startMs"": 1559000,
-      ""endMs"": 1562000,
+      ""startMs"": 2042500,
+      ""endMs"": 2042500,
       ""kind"": ""visual"",
-      ""claim"": ""At 25:59-26:02 the long chestnut-hair woman appears alone in a dark coat over white top with the spokesperson quote box displayed.""
+      ""claim"": ""Man with short white hair has no glasses or sunglasses on his face, beside 'OLDER WORLD LEADERS'.""
     },
     {
-      ""startMs"": 1570000,
-      ""endMs"": 1574000,
+      ""startMs"": 2047500,
+      ""endMs"": 2047500,
       ""kind"": ""visual"",
-      ""claim"": ""At 26:10-26:14 the same woman appears next to a man in a black suit/tie, wearing a green coat.""
+      ""claim"": ""Same white-haired man has a pouting mouth and no eyewear, beside 'OLDER WORLD LEADERS'.""
+    },
+    {
+      ""startMs"": 2052500,
+      ""endMs"": 2052500,
+      ""kind"": ""visual"",
+      ""claim"": ""Same man is wearing dark sunglasses on his face, beside 'THE WALL STREET JOURNAL' and headline text.""
     }
   ]
-}","{""completion_tokens"": 1037, ""completion_tokens_details"": {""reasoning_tokens"": 812}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 9327, ""prompt_tokens"": 9839, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 10876}",
+}","{""completion_tokens"": 1180, ""completion_tokens_details"": {""reasoning_tokens"": 917}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 8848, ""prompt_tokens"": 9360, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 10540}",
+muse,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,True,True,E,True,frame-state and candidate-context refinement,deepseek-v4-pro,107.69,3,api-rewatch,high,120000,"{
+  ""option"": ""E"",
+  ""explanation"": ""At 1561s the woman is in a dark coat over a white top with WHERE IS KATE? text. At 1577.5s, when she appears next to a man in a black pinstripe suit, she is wearing a light pink short-sleeve dress and waving. The direct reading associates this pink later state with option E."",
+  ""evidence"": [
+    {
+      ""startMs"": 1561000,
+      ""endMs"": 1561000,
+      ""kind"": ""visual"",
+      ""claim"": ""Woman with long brown hair wears dark coat over white top; lower banner shows WHERE IS KATE?.""
+    },
+    {
+      ""startMs"": 1577500,
+      ""endMs"": 1577500,
+      ""kind"": ""visual"",
+      ""claim"": ""Same woman next to a man in a black pinstripe suit wears a light pink short-sleeve dress and waves with right hand.""
+    }
+  ]
+}","{""completion_tokens"": 3698, ""completion_tokens_details"": {""reasoning_tokens"": 3480}, ""prompt_cache_hit_tokens"": 768, ""prompt_cache_miss_tokens"": 9238, ""prompt_tokens"": 10006, ""prompt_tokens_details"": {""cached_tokens"": 768}, ""total_tokens"": 13704}",
 muse,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 muse,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 muse,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
@@ -430,30 +437,30 @@ muse,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,False,,C,Tru
 }","{""completion_tokens"": 962, ""completion_tokens_details"": {""reasoning_tokens"": 827}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 6944, ""prompt_tokens"": 7200, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 8162}",
 muse,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
 muse,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-muse,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,completed failed-question retry,deepseek-v4-pro,13.83,1,api-rewatch,high,120000,"{
+muse,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,frame-state and candidate-context refinement,deepseek-v4-pro,18.66,2,api-rewatch,high,120000,"{
   ""option"": ""B"",
-  ""explanation"": ""The video is consistently described as an animated explainer about intercultural communication, with narrated lessons on cultural perspective, workplace differences, and the need for cultural intelligence, ending with credit to Dr. Deborah Swallow as a leading authority on intercultural communication. This aligns with quick ways to grasp fundamentals of intercultural communication, not conflicts, language learning, or political resolution."",
+  ""explanation"": ""The video explicitly presents insights into how different cultures communicate and understanding cultural differences, and closes by advising viewers to develop cultural intelligence to communicate confidently across cultures. This aligns with learning fundamentals of intercultural communication, not conflict history, language mastery, or political conflict resolution."",
   ""evidence"": [
     {
-      ""startMs"": 0,
-      ""endMs"": 115000,
-      ""kind"": ""computed"",
-      ""claim"": ""Reconciled overview: An animated explainer video about intercultural communication, featuring hand-drawn characters and narrated lessons on cultural perspective, workplace differences, and the need for cultural intelligence, ending with a credit for Dr. Deborah Swallow.""
+      ""startMs"": 57050,
+      ""endMs"": 64069,
+      ""kind"": ""transcript"",
+      ""claim"": ""Narrator: \""An insight into how different cultures communicate and a clear idea of how different cultures\""""
     },
     {
-      ""startMs"": 95000,
-      ""endMs"": 115000,
-      ""kind"": ""computed"",
-      ""claim"": ""End card displays Dr. Deborah Swallow, leading authority on intercultural communication, with website; 'Speaker, Author, Consultant' fades out.""
+      ""startMs"": 91400,
+      ""endMs"": 96600,
+      ""kind"": ""transcript"",
+      ""claim"": ""Narrator: \""Develop cultural intelligence so you can communicate confidently across cultures\""""
     },
     {
-      ""startMs"": 18800,
-      ""endMs"": 27200,
-      ""kind"": ""computed"",
-      ""claim"": ""Narrated questions focus on cross-cultural understanding: 'What happens when you speak?' and 'Do people from other cultures understand you in the way you intended?'""
+      ""startMs"": 110000,
+      ""endMs"": 110000,
+      ""kind"": ""ocr"",
+      ""claim"": ""On-screen text: INTERCULTURALCOMMUNICATION""
     }
   ]
-}","{""completion_tokens"": 963, ""completion_tokens_details"": {""reasoning_tokens"": 656}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 31480, ""prompt_tokens"": 31864, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 32827}",
+}","{""completion_tokens"": 968, ""completion_tokens_details"": {""reasoning_tokens"": 739}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 9516, ""prompt_tokens"": 9900, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 10868}",
 muse,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,30.4,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
   ""explanation"": ""The rewatch of 33.02–35.4s identifies the informally behaving staff (second from left behind the left counter, leaning then waving) as wearing a shirt with a dark floral flower pattern on a light base; original hue unknown."",
@@ -466,18 +473,30 @@ muse,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,Tr
     }
   ]
 }","{""completion_tokens"": 509, ""completion_tokens_details"": {""reasoning_tokens"": 371}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 8679, ""prompt_tokens"": 8935, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 9444}",
-muse,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,92.12,1,api-rewatch,high,120000,"{
+muse,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,,False,frame-state and candidate-context refinement,deepseek-v4-pro,97.05,4,api-rewatch,high,120000,"{
   ""option"": null,
-  ""explanation"": ""The supplied evidence only notes that a cartoon pilot flies an airplane over changing landscapes and landmarks (65.0s–88.48s). It does not name the places or identify a copilot itinerary, so none of the options can be confirmed as the place not traveled to."",
+  ""explanation"": ""The re-watched end segment (78–90s) shows the plane/copilot traveling over a domed building with minarets, the Eiffel Tower, the Statue of Liberty, twin towers, and pyramids. Thus options C (Egyptian Pyramids) and D (Eiffel Tower) are places the copilot does travel to. However, neither the White House nor Big Ben appears in the observed end sequence, so both A and B are supported as not traveled; the evidence cannot uniquely determine which single place is the intended answer."",
   ""evidence"": [
     {
-      ""startMs"": 65000,
-      ""endMs"": 88480,
-      ""kind"": ""computed"",
-      ""claim"": ""Reconciled event: Cartoon pilot flies airplane over changing landscapes and landmarks.""
+      ""startMs"": 78000,
+      ""endMs"": 90000,
+      ""kind"": ""visual"",
+      ""claim"": ""Plane/copilot observed over Eiffel Tower and Egyptian Pyramids in the end sequence; these are visited.""
+    },
+    {
+      ""startMs"": 78000,
+      ""endMs"": 90000,
+      ""kind"": ""visual"",
+      ""claim"": ""Neither The White House nor The Big Ben appears in the observed end sequence.""
+    },
+    {
+      ""startMs"": 78000,
+      ""endMs"": 90000,
+      ""kind"": ""visual"",
+      ""claim"": ""Because both A and B are absent from the observed end travel montage, no unique option is determinable.""
     }
   ]
-}","{""completion_tokens"": 1267, ""completion_tokens_details"": {""reasoning_tokens"": 1137}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 7536, ""prompt_tokens"": 7920, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 9187}",
+}","{""completion_tokens"": 4372, ""completion_tokens_details"": {""reasoning_tokens"": 4072}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 6910, ""prompt_tokens"": 6910, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 11282}",
 muse,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,retained recovered pass,deepseek-v4-pro,80.89,1,api-rewatch,high,120000,"{
   ""option"": ""C"",
   ""explanation"": ""The presentation is introduced as 'Fat: Why It Matters and What to Do About It,' and the sourced overview describes it as explaining how fat cell hypertrophy causes insulin resistance and contrasting caloric/endocrine theories, all centered on body fat, insulin resistance, and related metabolic conditions such as obesity and diabetes. Option D is too narrow because insulin's role is only one component of the talk, not the primary overall focus."",
@@ -528,36 +547,54 @@ muse,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,Tr
 }","{""completion_tokens"": 1328, ""completion_tokens_details"": {""reasoning_tokens"": 1093}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 290311, ""prompt_tokens"": 290823, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 292151}",
 muse,video-mme-623-3,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
-minimax,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,A,B,True,False,E,False,completed failed-question retry,deepseek-v4-pro,59.21,1,api-rewatch,high,120000,"{
-  ""option"": ""E"",
-  ""explanation"": ""Direct rewatch shows at 34:17 the short-white-haired man appears beside 'THE WALL STREET JOURNAL' wearing dark sunglasses, and he is still wearing them at 34:19 when the article graphic appears. No gold/silver framed glasses, hat, or change to black hair is visible; the added item is a pair of sunglasses."",
+minimax,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,A,B,True,False,,False,frame-state and candidate-context refinement,deepseek-v4-pro,120.17,2,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The supplied evidence does not contain the requested scene or text 'THE WALL STREET JOURNAL', nor does it show a man with short white hair and a pouting mouth. The available visual evidence covers other news segments, so the described change cannot be established."",
   ""evidence"": [
     {
-      ""startMs"": 2057000,
-      ""endMs"": 2079000,
+      ""startMs"": 0,
+      ""endMs"": 3128826,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled overview of broadcast topics does not include a Wall Street Journal segment or the described man.""
+    },
+    {
+      ""startMs"": 2093500,
+      ""endMs"": 2121000,
       ""kind"": ""visual"",
-      ""claim"": ""At 34:17–34:39, the short-white-haired man is shown next to the 'THE WALL STREET JOURNAL' heading wearing dark sunglasses, which he adjusts with both hands; he continues wearing them, with no other visible change before the scene cuts away at 34:32.""
+      ""claim"": ""Visual clip shows segment 'OLDER WORLD LEADERS', not 'THE WALL STREET JOURNAL'.""
     }
   ]
-}","{""completion_tokens"": 2971, ""completion_tokens_details"": {""reasoning_tokens"": 2778}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 30296, ""prompt_tokens"": 30296, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 33267}",
-minimax,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,C,E,True,False,,False,completed failed-question retry; abstained,deepseek-v4-pro,56.48,1,api-rewatch,high,120000,"{
-  ""option"": null,
-  ""explanation"": ""The rewatch observation at 26:14–26:16 shows the woman initially in a black coat and white blouse next to a man in a dark suit, then the same woman appears in a pale pink dress beside the same-looking man. The visible change is to a pink dress, not to any coat, so none of the provided coat options is supported."",
+}","{""completion_tokens"": 2556, ""completion_tokens_details"": {""reasoning_tokens"": 2368}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 29017, ""prompt_tokens"": 29529, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 32085}",
+minimax,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,C,E,True,False,D,False,frame-state and candidate-context refinement,deepseek-v4-pro,105.27,2,api-rewatch,high,120000,"{
+  ""option"": ""D"",
+  ""explanation"": ""At 25:58 she wears a black coat over a white blouse; at 25:59.5 the lower-third 'WHERE IS KATE?' appears. At 26:10 she is shown wearing a dark green coat over a light top while walking near a man in a dark suit. Thus the change to a green coat is the requested transition. A later 26:16 appearance is a pale pink outfit, not a coat."",
   ""evidence"": [
     {
-      ""startMs"": 1574000,
-      ""endMs"": 1574000,
+      ""startMs"": 1558000,
+      ""endMs"": 1558000,
       ""kind"": ""visual"",
-      ""claim"": ""The woman with long chestnut hair appears in a black coat and white blouse next to a man in a dark suit.""
+      ""claim"": ""Woman with long chestnut hair wears a black coat over a white blouse, standing next to a man in a dark suit.""
+    },
+    {
+      ""startMs"": 1559500,
+      ""endMs"": 1559500,
+      ""kind"": ""visible-text"",
+      ""claim"": ""Lower-third headline 'WHERE IS KATE?' is displayed over a close-up of the same woman.""
+    },
+    {
+      ""startMs"": 1570000,
+      ""endMs"": 1570000,
+      ""kind"": ""visual"",
+      ""claim"": ""The same woman wears a dark green coat over a light cream/white top while walking near a man in a dark suit.""
     },
     {
       ""startMs"": 1576000,
       ""endMs"": 1576000,
       ""kind"": ""visual"",
-      ""claim"": ""The same woman appears in a pale pink dress beside the same-looking man in a black suit, changing from the black coat and white blouse.""
+      ""claim"": ""Later she appears in a pale pink short-sleeved outfit next to a man in a dark suit, not a coat.""
     }
   ]
-}","{""completion_tokens"": 3180, ""completion_tokens_details"": {""reasoning_tokens"": 2958}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 13607, ""prompt_tokens"": 13991, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 17171}",
+}","{""completion_tokens"": 4099, ""completion_tokens_details"": {""reasoning_tokens"": 3744}, ""prompt_cache_hit_tokens"": 768, ""prompt_cache_miss_tokens"": 13681, ""prompt_tokens"": 14449, ""prompt_tokens_details"": {""cached_tokens"": 768}, ""total_tokens"": 18548}",
 minimax,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,,D,True,True,D,True,retained recovered pass,deepseek-v4-pro,25.97,1,api-rewatch,high,120000,"{
   ""option"": ""D"",
   ""explanation"": ""At 41:51–42:51, the re-watch observation records that when the screen text changes to 'GLOBAL WATCH', the man's right hand changes from resting flat on the table to holding and lifting a sheet of paper. This matches option D."",
@@ -607,85 +644,103 @@ minimax,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,
 minimax,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
 minimax,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
-minimax,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,completed failed-question retry,deepseek-v4-pro,18.23,1,api-rewatch,high,120000,"{
+minimax,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,frame-state and candidate-context refinement,deepseek-v4-pro,40.42,2,api-rewatch,high,120000,"{
   ""option"": ""B"",
-  ""explanation"": ""The video is an educational animation about intercultural communication. It presents key ideas such as cultural perspectives, direct vs indirect communication, egalitarian vs hierarchical management, and cultural intelligence. The closing title card identifies the presenter as 'Leading Authority on Intercultural Communication', confirming the topic is the fundamentals of intercultural communication."",
+  ""explanation"": ""The video focuses on intercultural communication: it states you need understanding of how different cultures trade, communicate, and manage people, and the title card identifies the presenter as a leading authority on intercultural communication. This matches learning about intercultural communication fundamentals, not historical conflicts, foreign language acquisition, or political conflict resolution."",
   ""evidence"": [
     {
-      ""startMs"": 0,
-      ""endMs"": 7500,
-      ""kind"": ""speech"",
-      ""claim"": ""Narration: 'It's a big world full of difference and diversity.'""
+      ""startMs"": 52685,
+      ""endMs"": 57850,
+      ""kind"": ""transcript"",
+      ""claim"": ""You need an understanding of how different cultures trade and do business.""
+    },
+    {
+      ""startMs"": 61370,
+      ""endMs"": 65130,
+      ""kind"": ""transcript"",
+      ""claim"": ""Insight into how different cultures communicate. And a clear idea of how different cultures manage people.""
     },
     {
       ""startMs"": 6500,
       ""endMs"": 8840,
-      ""kind"": ""speech"",
-      ""claim"": ""Narration: 'How you see others is influenced by your own cultural perspective.'""
-    },
-    {
-      ""startMs"": 50740,
-      ""endMs"": 53080,
-      ""kind"": ""speech"",
-      ""claim"": ""Narration: 'You need an understanding of how different cultures trade and do business.'""
-    },
-    {
-      ""startMs"": 59580,
-      ""endMs"": 61920,
-      ""kind"": ""speech"",
-      ""claim"": ""Narration: 'Insight into how different cultures communicate. And a clear idea of how different cultures manage people.'""
-    },
-    {
-      ""startMs"": 88480,
-      ""endMs"": 97320,
-      ""kind"": ""speech"",
-      ""claim"": ""Narration: 'Develop cultural intelligence so you can communicate confidently across cultures.'""
+      ""kind"": ""visual"",
+      ""claim"": ""Narration states: 'How you see others is influenced by your own cultural perspective.'""
     },
     {
       ""startMs"": 97320,
-      ""endMs"": 106160,
+      ""endMs"": 104820,
       ""kind"": ""visual"",
-      ""claim"": ""Title card: 'DR. DEBORAH SWALLOW' with 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.""
+      ""claim"": ""On-screen text labels Dr. Deborah Swallow as 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.""
     }
   ]
-}","{""completion_tokens"": 1600, ""completion_tokens_details"": {""reasoning_tokens"": 1183}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 60270, ""prompt_tokens"": 60526, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 62126}",
+}","{""completion_tokens"": 1882, ""completion_tokens_details"": {""reasoning_tokens"": 1585}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 10423, ""prompt_tokens"": 10935, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 12817}",
 minimax,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
-minimax,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,C,False,completed failed-question retry,deepseek-v4-pro,37.94,1,api-rewatch,high,120000,"{
-  ""option"": ""C"",
-  ""explanation"": ""A direct rewatch of 70–97s reports that the copilot travels over a landscape containing landmarks such as the Eiffel Tower and pyramids, but does not travel to the pyramid area."",
+minimax,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,A,False,frame-state and candidate-context refinement,deepseek-v4-pro,31.73,3,api-rewatch,high,120000,"{
+  ""option"": ""A"",
+  ""explanation"": ""At the end of the animation (78–88.5s), the backdrop cycles through the Taj Mahal, Eiffel Tower, Statue of Liberty, a pair of tall towers resembling Big Ben, and the Egyptian pyramids. No White House is observed. Therefore, the place the copilot does not travel to is the White House."",
   ""evidence"": [
     {
-      ""startMs"": 70000,
-      ""endMs"": 97000,
+      ""startMs"": 80250,
+      ""endMs"": 80250,
       ""kind"": ""visual"",
-      ""claim"": ""The copilot travels by plane and then by a long pointed vehicle over a landscape containing landmarks including the Taj Mahal, the Eiffel Tower, twin towers, the Statue of Liberty, and pyramids. The place the copilot does not travel to is the pyramid area.""
+      ""claim"": ""Landmark identified as Taj Mahal appears in animated backdrop.""
+    },
+    {
+      ""startMs"": 81750,
+      ""endMs"": 82500,
+      ""kind"": ""visual"",
+      ""claim"": ""Landmark identified as Eiffel Tower appears in animated backdrop.""
+    },
+    {
+      ""startMs"": 83250,
+      ""endMs"": 83250,
+      ""kind"": ""visual"",
+      ""claim"": ""Landmark identified as Statue of Liberty appears in animated backdrop.""
+    },
+    {
+      ""startMs"": 84000,
+      ""endMs"": 85500,
+      ""kind"": ""visual"",
+      ""claim"": ""Two tall connected towers resembling Big Ben appear in animated backdrop.""
+    },
+    {
+      ""startMs"": 86250,
+      ""endMs"": 87000,
+      ""kind"": ""visual"",
+      ""claim"": ""Landmark identified as Egyptian pyramids appears in animated backdrop.""
+    },
+    {
+      ""startMs"": 87750,
+      ""endMs"": 88500,
+      ""kind"": ""visual"",
+      ""claim"": ""No White House landmark is visible in backdrop at end sequence.""
     }
   ]
-}","{""completion_tokens"": 3109, ""completion_tokens_details"": {""reasoning_tokens"": 2956}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 13424, ""prompt_tokens"": 13680, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 16789}",
-minimax,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,False,D,False,completed failed-question retry,deepseek-v4-pro,158.24,3,api-rewatch,high,120000,"{
-  ""option"": ""D"",
-  ""explanation"": ""The presentation focuses on insulin's role in regulating fat cell growth, obesity, and diabetes, with explicit statements that insulin is essential for promoting and maintaining fat mass. Option D captures this central insulin-centric theme more precisely than the broader body fat-disease relationship in option C."",
+}","{""completion_tokens"": 1850, ""completion_tokens_details"": {""reasoning_tokens"": 1481}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 13433, ""prompt_tokens"": 13433, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 15283}",
+minimax,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,frame-state and candidate-context refinement,deepseek-v4-pro,58.9,5,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""The video presentation is titled 'Shrinking Fat Cells: Energy vs. Insulin' and its slides link body fat to insulin resistance, then list insulin resistance as the central condition connecting chronic diseases including obesity, diabetes, heart disease, cancer, and others. This directly matches option C's focus on the relationship between body fat, insulin resistance, and chronic diseases. Option D is narrower and emphasizes insulin's role in regulating obesity and diabetes plus maintaining fat mass, which omits the overarching body fat–insulin resistance–disease relationship."",
   ""evidence"": [
     {
-      ""startMs"": 83951,
+      ""startMs"": 83850,
       ""endMs"": 89850,
       ""kind"": ""visual"",
-      ""claim"": ""Title slide 'Shrinking Fat Cells: Energy vs. Insulin' and speaker Benjamin Bikman, PhD, introduced at Metabolic Health Summit.""
+      ""claim"": ""Title slide: 'Shrinking Fat Cells: Energy vs. Insulin' with speaker Benjamin Bikman, PhD.""
     },
     {
-      ""startMs"": 43760,
-      ""endMs"": 55080,
-      ""kind"": ""transcript"",
-      ""claim"": ""Narrator states Bikman's focus is to better understand the role of elevated insulin and nutrient signaling in regulating obesity, diabetes, and dementia.""
+      ""startMs"": 205293,
+      ""endMs"": 211293,
+      ""kind"": ""visual"",
+      ""claim"": ""Slide lists 'Insulin Resistance' as central condition connecting diseases including Diabetes, Obesity, Heart Disease, Cancer, Fatty Liver, PCOS, Erectile Dysfunction, Dementias, Migraines; also states over half of adults have insulin resistance.""
     },
     {
-      ""startMs"": 1780600,
-      ""endMs"": 1785600,
-      ""kind"": ""transcript"",
-      ""claim"": ""Speaker says insulin has an absolutely essential role in promoting and maintaining fat mass.""
+      ""startMs"": 231932,
+      ""endMs"": 234932,
+      ""kind"": ""visual"",
+      ""claim"": ""Slide poses question 'How does body fat cause insulin resistance?' with Fat Cells and Insulin Resistance labels.""
     }
   ]
-}","{""completion_tokens"": 2622, ""completion_tokens_details"": {""reasoning_tokens"": 2365}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 295977, ""prompt_tokens"": 296361, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 298983}",
+}","{""completion_tokens"": 2717, ""completion_tokens_details"": {""reasoning_tokens"": 2389}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 13442, ""prompt_tokens"": 13826, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 16543}",
 minimax,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,retained recovered pass,deepseek-v4-pro,40.41,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
   ""explanation"": ""The personal fat threshold is introduced first around 599.695–605.695s with the slide title and human silhouette. Fat-cell growth via hyperplasia is introduced next around 684.695–689.83s with the question 'What if we could force fat to store more fat?'. The relationship between insulin and diet is introduced later around 1351.95–1411.95s when the speaker describes fat cells grown in a 'sea of fats and glucose' and insulin telling them what to do with that energy. Therefore the order is ①②③."",

@@ -3820,5 +3820,1316 @@
       "total_tokens": 12977
     },
     "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1582,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "2064bb345a77d73d014f92ff97e449bd19ba4d80ec707cbe19fa119abdf0ddaf"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "2064bb345a77d73d014f92ff97e449bd19ba4d80ec707cbe19fa119abdf0ddaf"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The woman initially in a dark/black coat and white blouse with the 'WHERE IS KATE?' banner is Kate. When she later appears next to a man in a black suit (at about 1570s), she is wearing a green coat over a white top, so the change is to a green coat.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1559500,\n      \"endMs\": 1559500,\n      \"kind\": \"visual\",\n      \"claim\": \"Kate appears wearing a dark coat over a white blouse with 'WHERE IS KATE?' banner, alone in frame.\"\n    },\n    {\n      \"startMs\": 1570000,\n      \"endMs\": 1570000,\n      \"kind\": \"visual\",\n      \"claim\": \"Kate appears next to a man in a black suit with tie, wearing a green coat over a white top with 'WHERE IS KATE?' banner below.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:23:55.032415Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "080c62d27babd195c706b5390f261454b20ff8ad0b009b1613de9e571be567fc",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 50.5,
+    "predicted": "D",
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1972,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1757
+      },
+      "prompt_cache_hit_tokens": 768,
+      "prompt_cache_miss_tokens": 9325,
+      "prompt_tokens": 10093,
+      "prompt_tokens_details": {
+        "cached_tokens": 768
+      },
+      "total_tokens": 12065
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 90,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 78
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "2681240c1e5261782f071c7e69f98d74fdc084a6260419f7da264333355a7778"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "2681240c1e5261782f071c7e69f98d74fdc084a6260419f7da264333355a7778"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The rewatched end frames show the copilot traveling over the Eiffel Tower and the Egyptian Pyramids. The White House and Big Ben are not observed in those frames, so the evidence cannot establish which of those two was not traveled to.\",\n  \"evidence\": [\n    {\n      \"startMs\": 81750,\n      \"endMs\": 82500,\n      \"kind\": \"visual\",\n      \"claim\": \"Eiffel Tower centered below the plane at 81.75s, confirming it was traveled over.\"\n    },\n    {\n      \"startMs\": 86250,\n      \"endMs\": 87000,\n      \"kind\": \"visual\",\n      \"claim\": \"Three pyramids with sphinxes centered below the plane at 86.25s, confirming Egyptian Pyramids were traveled over.\"\n    },\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"visual\",\n      \"claim\": \"In the rewatched frames 78-90s, neither The White House nor The Big Ben appears, so the not-visited landmark cannot be distinguished from these frames.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:24:45.535623Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "31ea44e4837ce0c75b6888f7ce85ec609f6a76af8211997389876edbc7435939",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 48.09,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1707,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1450
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 6253,
+      "prompt_tokens": 6765,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 8472
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "minimax",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 384
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 432
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 480
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 528
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 576
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 624
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 672
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 720
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 768
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 816
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 864
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 912
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 960
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1008
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1056
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1104
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1152
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1200
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1248
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1296
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1344
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1392
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1440
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1488
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1536
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1584
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1632
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1680
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1728
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1776
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1824
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1872
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1920
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1968
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2016
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2064
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The presentation is by Benjamin Bikman, PhD, titled 'Shrinking Fat Cells: Energy vs. Insulin'. It focuses on the endocrine theory of obesity, explaining that insulin is the primary regulator of fat cell growth and shrinking. The speaker states fat cells cannot grow unless insulin is elevated, and insulin promotes fat storage, directly linking insulin to maintaining fat mass and regulating obesity and diabetes.\",\n  \"evidence\": [\n    {\n      \"startMs\": 83850,\n      \"endMs\": 89850,\n      \"kind\": \"visual\",\n      \"claim\": \"Title slide displays 'Shrinking Fat Cells: Energy vs. Insulin' and identifies Benjamin Bikman, PhD as the speaker.\"\n    },\n    {\n      \"startMs\": 1335950,\n      \"endMs\": 1341950,\n      \"kind\": \"computed\",\n      \"claim\": \"Slide item states 'Insulin promotes fat storage' under the Endocrine Theory diagram.\"\n    },\n    {\n      \"startMs\": 1433600,\n      \"endMs\": 1438720,\n      \"kind\": \"transcript\",\n      \"claim\": \"Speaker states 'fat cells cannot grow unless insulin is elevated', emphasizing insulin's essential role in fat cell growth.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:28:32.714175Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "64ab625e9517ff4ee23b3e9c0d562341a208f15c7c736302808b51e64b58bf29",
+    "indexVariantId": "larkup-quality-v9-vb-minimax-deepseek",
+    "latencySecs": 118.6,
+    "predicted": "D",
+    "questionId": "video-mme-623-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1991,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1716
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 296439,
+      "prompt_tokens": 296823,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 298814
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The video presentation is titled 'Shrinking Fat Cells: Energy vs. Insulin' and its slides link body fat to insulin resistance, then list insulin resistance as the central condition connecting chronic diseases including obesity, diabetes, heart disease, cancer, and others. This directly matches option C's focus on the relationship between body fat, insulin resistance, and chronic diseases. Option D is narrower and emphasizes insulin's role in regulating obesity and diabetes plus maintaining fat mass, which omits the overarching body fat–insulin resistance–disease relationship.\",\n  \"evidence\": [\n    {\n      \"startMs\": 83850,\n      \"endMs\": 89850,\n      \"kind\": \"visual\",\n      \"claim\": \"Title slide: 'Shrinking Fat Cells: Energy vs. Insulin' with speaker Benjamin Bikman, PhD.\"\n    },\n    {\n      \"startMs\": 205293,\n      \"endMs\": 211293,\n      \"kind\": \"visual\",\n      \"claim\": \"Slide lists 'Insulin Resistance' as central condition connecting diseases including Diabetes, Obesity, Heart Disease, Cancer, Fatty Liver, PCOS, Erectile Dysfunction, Dementias, Migraines; also states over half of adults have insulin resistance.\"\n    },\n    {\n      \"startMs\": 231932,\n      \"endMs\": 234932,\n      \"kind\": \"visual\",\n      \"claim\": \"Slide poses question 'How does body fat cause insulin resistance?' with Fat Cells and Insulin Resistance labels.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-18T07:37:19.258158Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "64ab625e9517ff4ee23b3e9c0d562341a208f15c7c736302808b51e64b58bf29",
+    "indexVariantId": "larkup-quality-v9-vb-minimax-deepseek",
+    "latencySecs": 58.9,
+    "predicted": "C",
+    "questionId": "video-mme-623-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2717,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2389
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 13442,
+      "prompt_tokens": 13826,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 16543
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 2080,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 2040
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "dd0618490fa49d216f799fa76a9fa73db8fa7ed47bcaa90714b6cd7ec9b12e8a"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "dd0618490fa49d216f799fa76a9fa73db8fa7ed47bcaa90714b6cd7ec9b12e8a"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The supplied evidence does not contain the requested scene or text 'THE WALL STREET JOURNAL', nor does it show a man with short white hair and a pouting mouth. The available visual evidence covers other news segments, so the described change cannot be established.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 3128826,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled overview of broadcast topics does not include a Wall Street Journal segment or the described man.\"\n    },\n    {\n      \"startMs\": 2093500,\n      \"endMs\": 2121000,\n      \"kind\": \"visual\",\n      \"claim\": \"Visual clip shows segment 'OLDER WORLD LEADERS', not 'THE WALL STREET JOURNAL'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:39:19.689037Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "369a23c62498aafa8d724969aaf4b427f88219f66a4fd2a870a111142d8f1de0",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 120.17,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2556,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2368
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 29017,
+      "prompt_tokens": 29529,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 32085
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "muse",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 2080,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 2040
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "d8d62a911ef753c11e7bae875efa671358a12c274dd5612e5b4fd87e8e3a9ae4"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "d8d62a911ef753c11e7bae875efa671358a12c274dd5612e5b4fd87e8e3a9ae4"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"E\",\n  \"explanation\": \"At 2042.5s and 2047.5s the white-haired man has no eyewear and a pouting mouth. At 2052.5s, when he appears beside 'THE WALL STREET JOURNAL', he is wearing dark sunglasses. The change is an added pair of sunglasses.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2042500,\n      \"endMs\": 2042500,\n      \"kind\": \"visual\",\n      \"claim\": \"Man with short white hair has no glasses or sunglasses on his face, beside 'OLDER WORLD LEADERS'.\"\n    },\n    {\n      \"startMs\": 2047500,\n      \"endMs\": 2047500,\n      \"kind\": \"visual\",\n      \"claim\": \"Same white-haired man has a pouting mouth and no eyewear, beside 'OLDER WORLD LEADERS'.\"\n    },\n    {\n      \"startMs\": 2052500,\n      \"endMs\": 2052500,\n      \"kind\": \"visual\",\n      \"claim\": \"Same man is wearing dark sunglasses on his face, beside 'THE WALL STREET JOURNAL' and headline text.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:39:21.098357Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "080c62d27babd195c706b5390f261454b20ff8ad0b009b1613de9e571be567fc",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 34.53,
+    "predicted": "E",
+    "questionId": "longvideobench-Fw1rirubXiU_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1180,
+      "completion_tokens_details": {
+        "reasoning_tokens": 917
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 8848,
+      "prompt_tokens": 9360,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 10540
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v1",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The video explicitly presents insights into how different cultures communicate and understanding cultural differences, and closes by advising viewers to develop cultural intelligence to communicate confidently across cultures. This aligns with learning fundamentals of intercultural communication, not conflict history, language mastery, or political conflict resolution.\",\n  \"evidence\": [\n    {\n      \"startMs\": 57050,\n      \"endMs\": 64069,\n      \"kind\": \"transcript\",\n      \"claim\": \"Narrator: \\\"An insight into how different cultures communicate and a clear idea of how different cultures\\\"\"\n    },\n    {\n      \"startMs\": 91400,\n      \"endMs\": 96600,\n      \"kind\": \"transcript\",\n      \"claim\": \"Narrator: \\\"Develop cultural intelligence so you can communicate confidently across cultures\\\"\"\n    },\n    {\n      \"startMs\": 110000,\n      \"endMs\": 110000,\n      \"kind\": \"ocr\",\n      \"claim\": \"On-screen text: INTERCULTURALCOMMUNICATION\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:39:55.624922Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "31ea44e4837ce0c75b6888f7ce85ec609f6a76af8211997389876edbc7435939",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 18.66,
+    "predicted": "B",
+    "questionId": "video-mme-010-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 968,
+      "completion_tokens_details": {
+        "reasoning_tokens": 739
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 9516,
+      "prompt_tokens": 9900,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 10868
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 2080,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 2040
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "a1d2cae1fb9d7c22a52572e0fad09aa8642374fdb371bcd2599f5226f7882317"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "a1d2cae1fb9d7c22a52572e0fad09aa8642374fdb371bcd2599f5226f7882317"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": \"E\",\n  \"explanation\": \"At the moment the man appears next to 'THE WALL STREET JOURNAL' text, the visual evidence shows him lowering sunglasses, which is the observed change; no hat, regular glasses, or black hair is indicated.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2041873,\n      \"endMs\": 2056873,\n      \"kind\": \"visual\",\n      \"claim\": \"Visible: Joe Biden, a white-haired man in a photo, is shown lowering sunglasses and wearing a blue suit and maroon tie; on-screen text includes 'THE WALL STREET JOURNAL' and the WSJ headline; cut to full-screen WSJ headline graphic with Biden photo at ~2051.1s.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:42:01.847377Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "e8857a94757b212ded64251822b00368443f0c745685e432a679a556f9dbf709",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 119.2,
+    "predicted": "E",
+    "questionId": "longvideobench-Fw1rirubXiU_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3348,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3179
+      },
+      "prompt_cache_hit_tokens": 768,
+      "prompt_cache_miss_tokens": 11373,
+      "prompt_tokens": 12141,
+      "prompt_tokens_details": {
+        "cached_tokens": 768
+      },
+      "total_tokens": 15489
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1582,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "da4870e99e84e6d2ef7dae7f88110bada9804b0336e7ae0fcb73929fcbdec051"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "da4870e99e84e6d2ef7dae7f88110bada9804b0336e7ae0fcb73929fcbdec051"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"E\",\n  \"explanation\": \"At 1559.5s the woman is seen in a dark/black coat over a white blouse, matching the initial state. At 1576s she appears beside a man in a black suit and has changed into a pink coat/dress. Therefore the change is into a pink coat.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1559500,\n      \"endMs\": 1559500,\n      \"kind\": \"visual\",\n      \"claim\": \"Kate is alone in a dark/black coat over a white blouse.\"\n    },\n    {\n      \"startMs\": 1576000,\n      \"endMs\": 1576000,\n      \"kind\": \"visual\",\n      \"claim\": \"Kate is beside a man in a black suit, wearing a pink coat/dress.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-18T07:44:01.050278Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "e8857a94757b212ded64251822b00368443f0c745685e432a679a556f9dbf709",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 110.2,
+    "predicted": "E",
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3539,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3351
+      },
+      "prompt_cache_hit_tokens": 768,
+      "prompt_cache_miss_tokens": 11945,
+      "prompt_tokens": 12713,
+      "prompt_tokens_details": {
+        "cached_tokens": 768
+      },
+      "total_tokens": 16252
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The video provides an introduction to navigating cultural differences, supported by narration about learning to navigate cultural landscapes, on-screen cultural dimensions (Deal vs. Relationship, Direct vs. Indirect), and a title card identifying Dr. Deborah Swallow as a leading authority on intercultural communication. It does not focus on historical conflicts, foreign language mastery, or political conflict resolution.\",\n  \"evidence\": [\n    {\n      \"startMs\": 24200,\n      \"endMs\": 29809,\n      \"kind\": \"transcript\",\n      \"claim\": \"Narration asks: 'And what happens with different cultures in the work place?'\"\n    },\n    {\n      \"startMs\": 41020,\n      \"endMs\": 47240,\n      \"kind\": \"transcript\",\n      \"claim\": \"Narration: 'In today's global business environment, it is essential to learn to navigate across different cultural landscapes.'\"\n    },\n    {\n      \"startMs\": 53080,\n      \"endMs\": 65000,\n      \"kind\": \"visual\",\n      \"claim\": \"On-screen cultural dimensions are shown as toggles and gauges: Deal vs. Relationship, Direct vs. Indirect, Egalitarian vs. Hierarchical.\"\n    },\n    {\n      \"startMs\": 97320,\n      \"endMs\": 104820,\n      \"kind\": \"visual\",\n      \"claim\": \"Title card identifies Dr. Deborah Swallow as 'Leading Authority on Intercultural Communication.'\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:45:51.248680Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "85b941da28fd678a53c240dffc06eaf8f840fac791482758c9e13deba0eb718d",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 37.33,
+    "predicted": "B",
+    "questionId": "video-mme-010-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1832,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1507
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 10644,
+      "prompt_tokens": 11028,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 12860
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 90,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 78
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "6e2d4291c5c35b20fceb3940a9f3ee9992a9b7c8e2297cca12814b4d234e0da5"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "6e2d4291c5c35b20fceb3940a9f3ee9992a9b7c8e2297cca12814b4d234e0da5"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The evidence shows the copilot/pilot flying over the Eiffel Tower (81.75s) and Egyptian pyramids (86.25s), so options C and D are traveled. In the scanned flight sequence (78–90s), neither the White House nor Big Ben appears, so the evidence cannot distinguish which of A or B is the place not traveled to.\",\n  \"evidence\": [\n    {\n      \"startMs\": 81750,\n      \"endMs\": 81750,\n      \"kind\": \"visual\",\n      \"claim\": \"The copilot/pilot flies over the Eiffel Tower at 81.75s.\"\n    },\n    {\n      \"startMs\": 86250,\n      \"endMs\": 86250,\n      \"kind\": \"visual\",\n      \"claim\": \"The copilot/pilot flies over the Egyptian pyramids at 86.25s.\"\n    },\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"visual\",\n      \"claim\": \"In the observed flight sequence (78–90s), landmarks shown are the Taj Mahal, Eiffel Tower, Statue of Liberty, Petronas towers, and Egyptian pyramids; neither the White House nor Big Ben is observed.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:46:28.577384Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "85b941da28fd678a53c240dffc06eaf8f840fac791482758c9e13deba0eb718d",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 113.71,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2080,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1797
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 7752,
+      "prompt_tokens": 8264,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 10344
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "minimax",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1582,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "aeac1d2299056079ee87a3d33cda0febc4069da4da78ebd7d4c8f50d64402393"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "aeac1d2299056079ee87a3d33cda0febc4069da4da78ebd7d4c8f50d64402393"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"At 25:58 she wears a black coat over a white blouse; at 25:59.5 the lower-third 'WHERE IS KATE?' appears. At 26:10 she is shown wearing a dark green coat over a light top while walking near a man in a dark suit. Thus the change to a green coat is the requested transition. A later 26:16 appearance is a pale pink outfit, not a coat.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1558000,\n      \"endMs\": 1558000,\n      \"kind\": \"visual\",\n      \"claim\": \"Woman with long chestnut hair wears a black coat over a white blouse, standing next to a man in a dark suit.\"\n    },\n    {\n      \"startMs\": 1559500,\n      \"endMs\": 1559500,\n      \"kind\": \"visible-text\",\n      \"claim\": \"Lower-third headline 'WHERE IS KATE?' is displayed over a close-up of the same woman.\"\n    },\n    {\n      \"startMs\": 1570000,\n      \"endMs\": 1570000,\n      \"kind\": \"visual\",\n      \"claim\": \"The same woman wears a dark green coat over a light cream/white top while walking near a man in a dark suit.\"\n    },\n    {\n      \"startMs\": 1576000,\n      \"endMs\": 1576000,\n      \"kind\": \"visual\",\n      \"claim\": \"Later she appears in a pale pink short-sleeved outfit next to a man in a dark suit, not a coat.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:48:04.333013Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "369a23c62498aafa8d724969aaf4b427f88219f66a4fd2a870a111142d8f1de0",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 105.27,
+    "predicted": "D",
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 4099,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3744
+      },
+      "prompt_cache_hit_tokens": 768,
+      "prompt_cache_miss_tokens": 13681,
+      "prompt_tokens": 14449,
+      "prompt_tokens_details": {
+        "cached_tokens": 768
+      },
+      "total_tokens": 18548
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 1582,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. List the observed states in source timestamp order, with a timestamp for each. A state seen BEFORE the described initial state cannot establish what happens AFTER it. Include later appearances of the same grounded subject instead of stopping at the first similar appearance. Record a visible state even when the other comparison state lies outside this window. Keep the subject binding grounded in source continuity or independently established identity. The property being compared may change: use initial appearance to locate the subject, not to require the old property in every later state. Describe the later state as visibly shown even if the question uses an imprecise object category. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1558
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "6a00ea053fe28d563c49ecd73ef031d1d8aa37cca14de4f4da7e7b3574060e0b"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "6a00ea053fe28d563c49ecd73ef031d1d8aa37cca14de4f4da7e7b3574060e0b"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"E\",\n  \"explanation\": \"At 1561s the woman is in a dark coat over a white top with WHERE IS KATE? text. At 1577.5s, when she appears next to a man in a black pinstripe suit, she is wearing a light pink short-sleeve dress and waving. The direct reading associates this pink later state with option E.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1561000,\n      \"endMs\": 1561000,\n      \"kind\": \"visual\",\n      \"claim\": \"Woman with long brown hair wears dark coat over white top; lower banner shows WHERE IS KATE?.\"\n    },\n    {\n      \"startMs\": 1577500,\n      \"endMs\": 1577500,\n      \"kind\": \"visual\",\n      \"claim\": \"Same woman next to a man in a black pinstripe suit wears a light pink short-sleeve dress and waves with right hand.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-18T07:48:07.276384Z",
+    "executionMode": "api-rewatch",
+    "expected": "E",
+    "finalReasoningEffort": "high",
+    "indexSha256": "080c62d27babd195c706b5390f261454b20ff8ad0b009b1613de9e571be567fc",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 107.69,
+    "predicted": "E",
+    "questionId": "longvideobench-Fw1rirubXiU_1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3698,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3480
+      },
+      "prompt_cache_hit_tokens": 768,
+      "prompt_cache_miss_tokens": 9238,
+      "prompt_tokens": 10006,
+      "prompt_tokens_details": {
+        "cached_tokens": 768
+      },
+      "total_tokens": 13704
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The video focuses on intercultural communication: it states you need understanding of how different cultures trade, communicate, and manage people, and the title card identifies the presenter as a leading authority on intercultural communication. This matches learning about intercultural communication fundamentals, not historical conflicts, foreign language acquisition, or political conflict resolution.\",\n  \"evidence\": [\n    {\n      \"startMs\": 52685,\n      \"endMs\": 57850,\n      \"kind\": \"transcript\",\n      \"claim\": \"You need an understanding of how different cultures trade and do business.\"\n    },\n    {\n      \"startMs\": 61370,\n      \"endMs\": 65130,\n      \"kind\": \"transcript\",\n      \"claim\": \"Insight into how different cultures communicate. And a clear idea of how different cultures manage people.\"\n    },\n    {\n      \"startMs\": 6500,\n      \"endMs\": 8840,\n      \"kind\": \"visual\",\n      \"claim\": \"Narration states: 'How you see others is influenced by your own cultural perspective.'\"\n    },\n    {\n      \"startMs\": 97320,\n      \"endMs\": 104820,\n      \"kind\": \"visual\",\n      \"claim\": \"On-screen text labels Dr. Deborah Swallow as 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:49:49.607916Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "7f26226ac16251234e56df9481e258d92f35fff838195ebfced632e94c70c9a4",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 40.42,
+    "predicted": "B",
+    "questionId": "video-mme-010-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1882,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1585
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 10423,
+      "prompt_tokens": 10935,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 12817
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 90,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 78
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "02bb284bffe61424675ca14ed585db490441f7d831775060f9b1df0b532953dc"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "02bb284bffe61424675ca14ed585db490441f7d831775060f9b1df0b532953dc"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The end-of-animation sequence (78–90s) shows the copilot with a backdrop of landmarks: Taj Mahal, Eiffel Tower, Statue of Liberty, Big Ben-like towers, and Egyptian pyramids. No White House appears, so the place the copilot does not travel to is the White House.\",\n  \"evidence\": [\n    {\n      \"startMs\": 80250,\n      \"endMs\": 87000,\n      \"kind\": \"visual\",\n      \"claim\": \"The backdrop cycles through the Taj Mahal at 80.25s, the Eiffel Tower at 81.75–82.5s, the Statue of Liberty at 83.25s, twin towers resembling Big Ben at 84–85.5s, and the Egyptian pyramids at 86.25–87s.\"\n    },\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"visual\",\n      \"claim\": \"No White House appears among the landmarks shown during the end sequence; the visible landmarks are the Taj Mahal, Eiffel Tower, Statue of Liberty, Big Ben-like towers, and Egyptian pyramids.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:50:30.023771Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "7f26226ac16251234e56df9481e258d92f35fff838195ebfced632e94c70c9a4",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 60.02,
+    "predicted": "A",
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2142,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1875
+      },
+      "prompt_cache_hit_tokens": 640,
+      "prompt_cache_miss_tokens": 12732,
+      "prompt_tokens": 13372,
+      "prompt_tokens_details": {
+        "cached_tokens": 640
+      },
+      "total_tokens": 15514
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v2",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 90,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 78
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "43f72e0f32cf8a7063a438747ad0d392c700eaf534cb3ee9b16d6defbcdb8e47"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "43f72e0f32cf8a7063a438747ad0d392c700eaf534cb3ee9b16d6defbcdb8e47"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The rewatch of the end segment (78–90s) shows the plane over the Eiffel Tower at 81.75s and over pyramids at 86.25s, so those options are visited. However, the same rewatch notes that neither the White House nor Big Ben appears in that stretch. Since the question asks which place the copilot does not travel to at the end, and the evidence only confirms two of the four options as visited while failing to show either of the other two, the evidence cannot establish whether the omitted place is the White House or Big Ben.\",\n  \"evidence\": [\n    {\n      \"startMs\": 81750,\n      \"endMs\": 81750,\n      \"kind\": \"direct observation\",\n      \"claim\": \"At 81.75s the plane is over the Eiffel Tower.\"\n    },\n    {\n      \"startMs\": 86250,\n      \"endMs\": 86250,\n      \"kind\": \"direct observation\",\n      \"claim\": \"At 86.25s the plane is over three pyramids (Egyptian Pyramids).\"\n    },\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"direct observation\",\n      \"claim\": \"The 78–90s rewatch found neither the White House nor Big Ben in the frames; among the answer options, only the Eiffel Tower and pyramids were seen.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:49:54.967650Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "31ea44e4837ce0c75b6888f7ce85ec609f6a76af8211997389876edbc7435939",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 101.16,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 4264,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3946
+      },
+      "prompt_cache_hit_tokens": 640,
+      "prompt_cache_miss_tokens": 6209,
+      "prompt_tokens": 6849,
+      "prompt_tokens_details": {
+        "cached_tokens": 640
+      },
+      "total_tokens": 11113
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "minimax",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v3",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 90,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 78
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "02bb284bffe61424675ca14ed585db490441f7d831775060f9b1df0b532953dc"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "02bb284bffe61424675ca14ed585db490441f7d831775060f9b1df0b532953dc"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"At the end of the animation (78–88.5s), the backdrop cycles through the Taj Mahal, Eiffel Tower, Statue of Liberty, a pair of tall towers resembling Big Ben, and the Egyptian pyramids. No White House is observed. Therefore, the place the copilot does not travel to is the White House.\",\n  \"evidence\": [\n    {\n      \"startMs\": 80250,\n      \"endMs\": 80250,\n      \"kind\": \"visual\",\n      \"claim\": \"Landmark identified as Taj Mahal appears in animated backdrop.\"\n    },\n    {\n      \"startMs\": 81750,\n      \"endMs\": 82500,\n      \"kind\": \"visual\",\n      \"claim\": \"Landmark identified as Eiffel Tower appears in animated backdrop.\"\n    },\n    {\n      \"startMs\": 83250,\n      \"endMs\": 83250,\n      \"kind\": \"visual\",\n      \"claim\": \"Landmark identified as Statue of Liberty appears in animated backdrop.\"\n    },\n    {\n      \"startMs\": 84000,\n      \"endMs\": 85500,\n      \"kind\": \"visual\",\n      \"claim\": \"Two tall connected towers resembling Big Ben appear in animated backdrop.\"\n    },\n    {\n      \"startMs\": 86250,\n      \"endMs\": 87000,\n      \"kind\": \"visual\",\n      \"claim\": \"Landmark identified as Egyptian pyramids appears in animated backdrop.\"\n    },\n    {\n      \"startMs\": 87750,\n      \"endMs\": 88500,\n      \"kind\": \"visual\",\n      \"claim\": \"No White House landmark is visible in backdrop at end sequence.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:53:17.721886Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "7f26226ac16251234e56df9481e258d92f35fff838195ebfced632e94c70c9a4",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 31.73,
+    "predicted": "A",
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1850,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1481
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 13433,
+      "prompt_tokens": 13433,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 15283
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v3",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 90,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 78
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "43f72e0f32cf8a7063a438747ad0d392c700eaf534cb3ee9b16d6defbcdb8e47"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "43f72e0f32cf8a7063a438747ad0d392c700eaf534cb3ee9b16d6defbcdb8e47"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The re-watched end segment (78–90s) shows the plane/copilot traveling over a domed building with minarets, the Eiffel Tower, the Statue of Liberty, twin towers, and pyramids. Thus options C (Egyptian Pyramids) and D (Eiffel Tower) are places the copilot does travel to. However, neither the White House nor Big Ben appears in the observed end sequence, so both A and B are supported as not traveled; the evidence cannot uniquely determine which single place is the intended answer.\",\n  \"evidence\": [\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"visual\",\n      \"claim\": \"Plane/copilot observed over Eiffel Tower and Egyptian Pyramids in the end sequence; these are visited.\"\n    },\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"visual\",\n      \"claim\": \"Neither The White House nor The Big Ben appears in the observed end sequence.\"\n    },\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"visual\",\n      \"claim\": \"Because both A and B are absent from the observed end travel montage, no unique option is determinable.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:53:17.122540Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "31ea44e4837ce0c75b6888f7ce85ec609f6a76af8211997389876edbc7435939",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 97.05,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 4372,
+      "completion_tokens_details": {
+        "reasoning_tokens": 4072
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 6910,
+      "prompt_tokens": 6910,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 11282
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "qwen",
+    "condition": "frame-state-refinement-20261118:managed-refinement-v3",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 90,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 78
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "6e2d4291c5c35b20fceb3940a9f3ee9992a9b7c8e2297cca12814b4d234e0da5"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "6e2d4291c5c35b20fceb3940a9f3ee9992a9b7c8e2297cca12814b4d234e0da5"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The retrieved flight sequence (78–90s) shows the copilot over the Eiffel Tower at 81.75s and the Egyptian pyramids at 86.25s, so options C and D are traveled. The White House and Big Ben are not observed in this sequence, but their absence is not proof they were not visited elsewhere. Since both A and B are equally unsupported by the supplied evidence, no single option is supported.\",\n  \"evidence\": [\n    {\n      \"startMs\": 81750,\n      \"endMs\": 81750,\n      \"kind\": \"visual\",\n      \"claim\": \"At 81.75s the plane is over the Eiffel Tower.\"\n    },\n    {\n      \"startMs\": 86250,\n      \"endMs\": 86250,\n      \"kind\": \"visual\",\n      \"claim\": \"At 86.25s the plane is over the Egyptian pyramids.\"\n    },\n    {\n      \"startMs\": 78000,\n      \"endMs\": 90000,\n      \"kind\": \"visual\",\n      \"claim\": \"In the rewatched sequence from 78–90s, the White House and Big Ben are not observed; both A and B are equally unsupported by the supplied evidence.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-18T07:53:17.414933Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "85b941da28fd678a53c240dffc06eaf8f840fac791482758c9e13deba0eb718d",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 94.61,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 4381,
+      "completion_tokens_details": {
+        "reasoning_tokens": 4101
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 8325,
+      "prompt_tokens": 8325,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 12706
+    },
+    "valid_format": false
+  },
+  {
+    "condition": "reader-as-answerer-20261118:single-attempt",
+    "state": "completed",
+    "questionId": "video-mme-010-3",
+    "reader": "qwen",
+    "brain": "alibaba/qwen3.8-max",
+    "reasoning": "none",
+    "temperature": 0,
+    "promptSha256": "7e3ef2886d5415650fa6f6b7961278838dd8ec8527671f090c684856d225bf1d",
+    "evidenceSha256": "9fc88eb806f44c4db6a84cc08b0532c20772b55cbff49aff148153122591f173",
+    "method": "Selected reader also synthesizes the answer from existing canonical evidence; distinct configuration, not a new vision read.",
+    "expectedAnswerSent": false,
+    "answer": "{\"option\":\"A\",\"explanation\":\"During the flight sequence at the end of the animation, the plane visibly passes over the Taj Mahal (~80.25s), the Eiffel Tower (~81.75s), the Statue of Liberty (~83.25s), Petronas-style twin towers (~84.75s), and the Egyptian pyramids (~86.25s). The Eiffel Tower (D) and Egyptian Pyramids (C) are therefore visited. Neither the White House (A) nor Big Ben (B) appears in these frames. There is ambiguity between A and B since both are absent from the observed landmarks; however, the White House is selected as the best-supported answer given it is a listed landmark never shown while the other two options are confirmed visited.\",\"evidence\":[{\"startMs\":80250,\"endMs\":81750,\"kind\":\"visual\",\"claim\":\"White domed mausoleum with minarets (Taj Mahal) appears below the plane.\"},{\"startMs\":81750,\"endMs\":83250,\"kind\":\"visual\",\"claim\":\"Lattice tower (Eiffel Tower) centered below the plane.\"},{\"startMs\":83250,\"endMs\":84750,\"kind\":\"visual\",\"claim\":\"Statue with raised torch (Statue of Liberty) below the plane.\"},{\"startMs\":84750,\"endMs\":86250,\"kind\":\"visual\",\"claim\":\"Two spired towers connected by a bridge (Petronas-style twin towers) below the plane.\"},{\"startMs\":86250,\"endMs\":88500,\"kind\":\"visual\",\"claim\":\"Cluster of pyramids with sphinx-like blocks (Egyptian pyramids) below the plane.\"},{\"startMs\":88500,\"endMs\":90000,\"kind\":\"visual\",\"claim\":\"Figures display thought bubbles ('AHA!', 'YAY!', 'GOT IT!', 'I'll JOIN', 'THAT's CLEAR'); no White House or Big Ben visible.\"}]}",
+    "usage": {
+      "inputTokens": 8352,
+      "inputTokenDetails": {
+        "noCacheTokens": 8352,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0
+      },
+      "outputTokens": 448,
+      "outputTokenDetails": {
+        "textTokens": 448,
+        "reasoningTokens": 0
+      },
+      "totalTokens": 8800,
+      "raw": {
+        "prompt_tokens": 8352,
+        "completion_tokens": 448,
+        "total_tokens": 8800,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "text_tokens": 8352
+        }
+      }
+    },
+    "finishReason": "stop",
+    "latencySecs": 10.58,
+    "correct": false,
+    "predicted": "A",
+    "valid_format": true,
+    "abstained": false
   }
 ]
