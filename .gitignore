@@ -85,3 +85,6 @@ scratch/
 
 # Unfinished video paper, diagrams, benchmarks and demo artifacts.
 /packages/marketplace-tools/video-intelligence/research/
+
+# Internal video benchmark harness, data and reports.
+/packages/marketplace-tools/video-intelligence/benchmarks/

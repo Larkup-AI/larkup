@@ -1,1 +1,0 @@
-{"answer": "{\"scope\": \"source\", \"goal\": \"synthesize\", \"evidence\": [\"speech\", \"visual\", \"visible-text\", \"computed\"]}", "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."}

@@ -1,1 +1,0 @@
-{"cpuFallback":false,"detectorSha256":"c5c2d13e59ae883e6af3b45daea64af4833a4951c92d116ec270d9ddbe998063","device":"CUDAExecutionProvider","gpu":"NVIDIA RTX A5000","onnxruntime":"1.22.0","outputShapes":[[1,8400,85]],"providerCredentials":"PC only via private SSH relay","runtime":"unchanged canonical Python runtime; isolated RunPod Pod","verifiedAt":"2026-11-14T12:49:04.844018Z"}

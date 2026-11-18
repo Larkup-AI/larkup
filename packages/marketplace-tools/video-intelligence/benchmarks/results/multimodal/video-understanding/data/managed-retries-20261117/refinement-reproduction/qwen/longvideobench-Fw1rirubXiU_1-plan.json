@@ -1,1 +1,0 @@
-{"answer": "{\"scope\": \"temporal\", \"goal\": \"compare\", \"evidence\": [\"visual\", \"visible-text\"], \"timeRange\": {\"startSecs\": 1558, \"endSecs\": 1582}}", "provenance": "Diagnostic source-guided bounds from prior observed frames/labels; source-wide synthesis for overall topics. No expected option supplied."}

@@ -1,9 +1,0 @@
-runId,variantId,system,model,routeId,sourceId,sourceDurationMs,questionId,state,nonemptyResponse,predictedOption,correct,knownCashUSD,estimatedUSD,unknownChargeAttempts,responseMs
-run-73d801467afc482527cd,minimax-m3-frames-v1,minimax,minimax-m3,minimax-m3-gateway,development-smoke,8000,smoke-audio,completed,True,,False,0.00302568,0.0030564,0,3350.3925830000003
-run-73d801467afc482527cd,muse-spark13-frames-v1,muse,muse-spark-1.3,muse-spark13-gateway,development-smoke,8000,smoke-audio,completed,True,C,True,0.01595425,0.01595425,0,5171.798417000002
-run-73d801467afc482527cd,qwen38-max-frames-v1,qwen,qwen3.8-max,qwen38-max-gateway,development-smoke,8000,smoke-audio,completed,True,C,True,0.01674,0.01674,0,10545.462208
-run-73d801467afc482527cd,minimax-m3-frames-v1,minimax,minimax-m3,minimax-m3-gateway,development-smoke,8000,smoke-visual,completed,True,,False,0.00301338,0.0030441,0,1718.391458
-run-73d801467afc482527cd,muse-spark13-frames-v1,muse,muse-spark-1.3,muse-spark13-gateway,development-smoke,8000,smoke-visual,completed,True,A,True,0.0182135,0.0182135,0,9730.271083
-run-73d801467afc482527cd,qwen38-max-frames-v1,qwen,qwen3.8-max,qwen38-max-gateway,development-smoke,8000,smoke-visual,completed,True,A,True,0.006258,0.018802,0,14963.998042
-run-8619aed7896ea14c32f7,minimax-m3-frames-v2,minimax,minimax-m3,minimax-m3-gateway,development-smoke,8000,smoke-audio,completed,True,C,True,0.00302388,0.0030546,0,1016.2513329999996
-run-8619aed7896ea14c32f7,minimax-m3-frames-v2,minimax,minimax-m3,minimax-m3-gateway,development-smoke,8000,smoke-visual,completed,True,A,True,0.00301698,0.0030477,0,3236.350125
