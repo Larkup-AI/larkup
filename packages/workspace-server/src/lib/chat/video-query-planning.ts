@@ -29,7 +29,7 @@ export function reconcileVideoInvestigation(
     };
   }
   if (signals?.hasPosition === false && planned?.timeRange) {
-    return { scope: 'source', goal: 'synthesize' };
+    return unboundedVideoInvestigation(planned);
   }
   if ((signals?.connectsBeyondPosition || planned?.goal === 'trace') && planned?.timeRange) {
     return {
@@ -41,4 +41,34 @@ export function reconcileVideoInvestigation(
     };
   }
   return planned;
+}
+
+/** Drop an unsupported source boundary while preserving the evidence operation. */
+export function unboundedVideoInvestigation(
+  planned: VideoInvestigationDirective,
+): VideoInvestigationDirective {
+  const unbounded = { ...planned };
+  delete unbounded.timeRange;
+  return unbounded;
+}
+
+export function videoSourceTimestamp(range: {
+  startSecs?: unknown;
+  endSecs?: unknown;
+}): string | undefined {
+  const start = range.startSecs;
+  const end = range.endSecs;
+  if (typeof start !== 'number' || !Number.isFinite(start) || start < 0) return undefined;
+  const format = (seconds: number) => {
+    const value = Math.floor(seconds);
+    const hours = Math.floor(value / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+    const remainder = String(value % 60).padStart(2, '0');
+    return hours > 0
+      ? `${hours}:${String(minutes).padStart(2, '0')}:${remainder}`
+      : `${minutes}:${remainder}`;
+  };
+  return typeof end === 'number' && Number.isFinite(end) && end > start
+    ? `${format(start)}–${format(end)}`
+    : format(start);
 }

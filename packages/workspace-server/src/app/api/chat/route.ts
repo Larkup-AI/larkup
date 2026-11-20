@@ -551,15 +551,15 @@ function parseVideoInvestigationDirective(value: string): VideoInvestigationDire
     }
     // A numerical range must be attributable to a source position the user
     // actually referenced.  Otherwise it is a plausible-looking but invented
-    // cut of the recording; safely broaden to source synthesis rather than
-    // silently hiding relevant material.  This rule operates on structured
+    // cut of the recording; remove that boundary without changing the
+    // operation or discarding the requested evidence modalities.  This rule operates on structured
     // planner output only and therefore works in every user language.
     const hasUnattributedRange = timeRange !== undefined && timeRangeOrigin !== 'user-mentioned';
     return {
-      scope: hasUnattributedRange ? 'source' : scope,
-      goal: hasUnattributedRange ? 'synthesize' : goal,
-      ...(hasUnattributedRange ? {} : evidence?.length ? { evidence: [...new Set(evidence)] } : {}),
-      ...(hasUnattributedRange ? {} : recordSet ? { recordSet } : {}),
+      scope,
+      goal,
+      ...(evidence?.length ? { evidence: [...new Set(evidence)] } : {}),
+      ...(recordSet ? { recordSet } : {}),
       ...(!hasUnattributedRange && timeRange
         ? { timeRange: { startSecs: timeRange.startSecs, endSecs: timeRange.endSecs } }
         : {}),

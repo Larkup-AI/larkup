@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { formatExhaustiveMediaAnswer } from '../src/lib/chat/tool-context.ts';
+import {
+  compactToolContextForModel,
+  formatExhaustiveMediaAnswer,
+} from '../src/lib/chat/tool-context.ts';
 
 const rows = Array.from({ length: 64 }, (_, index) => ({
   id: `observation-${index}`,
@@ -55,4 +58,34 @@ test('an authored inventory remains a final table without reconstructing missing
   );
   assert.match(answer ?? '', /64 indexed source-questions records/);
   assert.match(answer ?? '', /not a guarantee of complete source coverage/);
+});
+
+test('media evidence delivered to the answer model includes an explicit source clock', () => {
+  const messages = compactToolContextForModel([
+    {
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolName: 'queryVideoEvidence',
+          output: {
+            success: true,
+            mediaAssetId: 'independent-source',
+            evidence: [
+              {
+                id: 'speech-1',
+                modality: 'transcript',
+                timeRange: { startSecs: 13.25, endSecs: 29.9 },
+                payload: { text: 'An explanation.' },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ]);
+  const output = messages[0].content[0].output;
+  assert.equal(output.timeRangeUnit, 'seconds');
+  assert.equal(output.evidence[0].sourceTimestamp, '0:13–0:29');
+  assert.equal(output.evidence[0].timeRange.startSecs, 13.25);
 });

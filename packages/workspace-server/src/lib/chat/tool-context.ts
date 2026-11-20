@@ -1,4 +1,5 @@
 import { formatTabularVisualizationAnswer } from './tabular-visualization';
+import { videoSourceTimestamp } from './video-query-planning';
 
 type ToolResultPart = {
   type?: string;
@@ -1065,6 +1066,7 @@ function compactMediaEvidence(value: unknown): unknown {
     mediaAssetId: result.mediaAssetId,
     fileName: result.fileName,
     supportingClip: result.supportingClip,
+    timeRangeUnit: 'seconds',
     claimVerification: result.claimVerification,
     investigation: result.investigation,
     observedSubjects: Array.isArray(result.observedSubjects)
@@ -1096,6 +1098,7 @@ function compactMediaEvidence(value: unknown): unknown {
     evidence: result.evidence.slice(0, evidenceLimit).map((item: any) => ({
       id: item.id ?? item.evidenceId,
       modality: item.modality,
+      sourceTimestamp: videoSourceTimestamp(item.timeRange ?? item),
       timeRange: item.timeRange ?? {
         startSecs: item.startSecs,
         endSecs: item.endSecs,

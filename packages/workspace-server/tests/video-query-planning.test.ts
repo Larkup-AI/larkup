@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { reconcileVideoInvestigation } from '../src/lib/chat/video-query-planning.ts';
+import {
+  reconcileVideoInvestigation,
+  videoSourceTimestamp,
+} from '../src/lib/chat/video-query-planning.ts';
 import { collectExhaustiveVideoEvidencePages } from '../src/lib/chat/video-rag-routing.ts';
 
 test('settled outcomes override an incorrect broad synthesis plan', () => {
@@ -135,4 +138,41 @@ test('a long source inventory follows every opaque cursor into one renderable ta
   assert.equal(result.rows[124].text, 'Lecture segment 124');
   assert.equal(result.continuation.hasMore, false);
   assert.equal(result.continuation.contextLimitReached, false);
+});
+
+test('an invented source boundary is removed without changing a focused speech question into synthesis', () => {
+  assert.deepEqual(
+    reconcileVideoInvestigation(
+      {
+        scope: 'focused',
+        goal: 'answer',
+        evidence: ['speech'],
+        timeRange: { startSecs: 0, endSecs: 25 },
+      },
+      { hasPosition: false, asksForExhaustiveCoverage: false },
+    ),
+    { scope: 'focused', goal: 'answer', evidence: ['speech'] },
+  );
+});
+
+test('removing an invented boundary preserves source-wide question inventories and modalities', () => {
+  assert.deepEqual(
+    reconcileVideoInvestigation(
+      {
+        scope: 'source',
+        goal: 'enumerate',
+        recordSet: 'source-questions',
+        evidence: ['speech'],
+        timeRange: { startSecs: 0, endSecs: 25 },
+      },
+      { hasPosition: false },
+    ),
+    { scope: 'source', goal: 'enumerate', recordSet: 'source-questions', evidence: ['speech'] },
+  );
+});
+
+test('source clocks keep seconds distinct from minutes and support long recordings', () => {
+  assert.equal(videoSourceTimestamp({ startSecs: 13.25, endSecs: 29.9 }), '0:13–0:29');
+  assert.equal(videoSourceTimestamp({ startSecs: 3672, endSecs: 3715 }), '1:01:12–1:01:55');
+  assert.equal(videoSourceTimestamp({ startSecs: NaN }), undefined);
 });

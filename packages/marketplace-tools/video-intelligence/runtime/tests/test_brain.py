@@ -14,6 +14,7 @@ from app.services.brain import (
     _source_inventory_chunks,
     _source_inventory_prompt,
     _validated_source_activity_structures,
+    _validated_plan,
     _validated_source_inventory,
     _validated_source_task_instances,
     _synthesis_prompt,
@@ -25,6 +26,13 @@ from app.services.brain import (
 
 
 class AgentPlannerTests(unittest.TestCase):
+    def test_planner_cannot_discard_available_source_speech(self):
+        for mode in ["fast", "balanced", "thorough"]:
+            plan = _validated_plan({"useTranscript": False}, fallback_plan(mode, 240, True), 240, False)
+            self.assertTrue(plan.use_transcript)
+        silent = _validated_plan({"useTranscript": True}, fallback_plan("balanced", 240, False), 240, False)
+        self.assertFalse(silent.use_transcript)
+
     def test_source_inventory_chunks_cover_full_source_without_sampling_transcript(self) -> None:
         transcript = [
             {

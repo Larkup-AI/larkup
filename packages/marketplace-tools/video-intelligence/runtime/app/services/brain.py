@@ -2651,7 +2651,9 @@ def _validated_plan(
     frames = round(
         bounded_number("framesPerClip", *bounds["frames"], fallback.frames_per_clip)
     )
-    use_transcript = flag("useTranscript", fallback.use_transcript)
+    # Source speech is reusable evidence, not an optional visual-planner hint.
+    # Explicit transcript reuse/skipping is handled by the pipeline brief.
+    use_transcript = fallback.use_transcript
     use_ocr = False if heavy_disabled else flag("useOcr", fallback.use_ocr)
     use_object_detection = (
         False
