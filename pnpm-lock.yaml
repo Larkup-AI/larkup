@@ -383,7 +383,7 @@ importers:
         specifier: ^0.2.1
         version: link:../../packages/integrations
       '@larkup/marketplace':
-        specifier: ^0.3.15
+        specifier: ^0.3.16
         version: link:../../packages/marketplace
       '@larkup/runtime-kit':
         specifier: workspace:*
