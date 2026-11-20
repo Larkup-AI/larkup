@@ -1,5 +1,12 @@
 # larkup
 
+## 0.5.12
+
+### Patch Changes
+
+- Updated dependencies [61d82d2]
+  - @larkup/workspace-server@0.2.75
+
 ## 0.5.11
 
 ### Patch Changes

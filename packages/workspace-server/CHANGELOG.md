@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.75
+
+### Patch Changes
+
+- 61d82d2: Preserve available source speech during indexing, retain focused query intent when discarding invented time boundaries, and deliver explicitly formatted source timestamps to answer models.
+
 ## 0.2.74
 
 ### Patch Changes

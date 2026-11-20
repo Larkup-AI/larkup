@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.25
+
+### Patch Changes
+
+- 61d82d2: Preserve available source speech during indexing, retain focused query intent when discarding invented time boundaries, and deliver explicitly formatted source timestamps to answer models.
+
 ## 0.3.24
 
 ### Patch Changes
