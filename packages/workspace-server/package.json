@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-server",
-  "version": "0.2.73",
+  "version": "0.2.74",
   "type": "module",
   "files": [
     "src",

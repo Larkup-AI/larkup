@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.74
+
+### Patch Changes
+
+- fbad799: Overlap independent video evidence reads and source planning, preserve complete question-inventory directives, admit the benchmark-selected hosted reader, and retain chunk-scoped Deepgram voice attribution in transcript evidence and source inventories.
+
 ## 0.2.73
 
 ### Patch Changes
