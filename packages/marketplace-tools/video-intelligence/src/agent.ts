@@ -759,7 +759,11 @@ function evidenceHitsFor(
           .filter((hit) => hit.evidence.modality === 'visual' && isAccountOfMoment(hit))
           .slice(0, 4)
       : [];
-  const combined = mergeHits(localAnchor, primary, selected);
+  const combined = mergeHits(localAnchor, primary, selected).filter(
+    (hit) =>
+      !plan.modalities?.length ||
+      plan.modalities.some((modality) => modality === hit.evidence.modality),
+  );
   return (primary.length > 0 ? combined.slice(0, Math.min(input.limit ?? 36, 48)) : combined).map(
     (hit) => toEvidence(hit, plan),
   );
@@ -1031,7 +1035,11 @@ async function retrieve(
   plan: VideoPlan,
   durationSecs: number | undefined,
 ) {
-  const options = { queryPlan: plan, videoDurationSecs: durationSecs };
+  const options = {
+    queryPlan: plan,
+    videoDurationSecs: durationSecs,
+    ...(plan.modalities?.length ? { modalities: plan.modalities } : {}),
+  };
   // A named person and an identity anchor are extra retrieval handles for the
   // same index, not separate strategies. Issuing them alongside the ranked
   // lookup costs one round trip instead of three.
@@ -1270,6 +1278,12 @@ function assessEvidence(
   investigation: VideoInvestigation,
   watched: WatchedRanges = { ranges: [], since: '' },
 ): EvidenceAssessment {
+  const requestedModalities = plan.modalities;
+  if (requestedModalities?.length) {
+    hits = hits.filter((hit) =>
+      requestedModalities.some((modality) => modality === hit.evidence.modality),
+    );
+  }
   // Source scope can mean searching everywhere for one missing detail.
   // Indexed coverage does not establish that detail or a requested comparison.
   const detailUnresolved =

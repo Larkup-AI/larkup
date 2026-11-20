@@ -49,7 +49,8 @@ test('planVideoQuestion: preserves a focused factual lookup as a search', () => 
   assert.equal(plan.route, 'search');
   assert.deepEqual(plan.modalities, ['ocr']);
   assert.equal(plan.requiresBothRanges, false);
-  assert.ok(plan.kinds.includes('visual-fact'));
+  assert.ok(plan.kinds.includes('exact-ocr'));
+  assert.ok(!plan.kinds.includes('visual-fact'));
 });
 
 test('planVideoQuestion: maps a settled outcome without reading question wording', () => {
@@ -117,4 +118,19 @@ test('planVideoQuestion: refuses a malformed directive instead of guessing from 
       }),
     /content-neutral directive/,
   );
+});
+
+test('spoken factual answers use speech instead of requiring a visual observation', () => {
+  const plan = planVideoQuestion('A source fact', directive('focused', 'answer', ['speech']));
+  assert.ok(plan.kinds.includes('direct-speech'));
+  assert.ok(!plan.kinds.includes('visual-fact'));
+});
+
+test('visual requests retain visual verification when other evidence is also available', () => {
+  const plan = planVideoQuestion(
+    'A source fact',
+    directive('focused', 'answer', ['speech', 'visible-text', 'visual']),
+  );
+  assert.ok(plan.kinds.includes('visual-fact'));
+  assert.ok(!plan.kinds.includes('exact-ocr'));
 });

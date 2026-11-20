@@ -47,7 +47,10 @@ import {
   retrievalToolsForStep,
 } from '../../../lib/chat/retrieval-routing';
 import { collectExhaustiveVideoEvidencePages } from '../../../lib/chat/video-rag-routing';
-import { reconcileVideoInvestigation } from '../../../lib/chat/video-query-planning';
+import {
+  reconcileVideoInvestigation,
+  resolveVideoEvidenceQuestion,
+} from '../../../lib/chat/video-query-planning';
 import {
   extractConversationEvidence,
   extractLatestAnalysisArtifact,
@@ -350,7 +353,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
   ) {
     return mediaSourceLocatedNotice(mediaAssetId);
   }
-  return `\n\nCURRENT USER QUESTION:\n${question}\n\nVERIFIED SOURCE EVIDENCE FOR THIS TURN:\n${
+  return `${mediaAssetId ? '\nSOURCE CLOCK: timeRange.startSecs/endSecs are elapsed seconds. Use sourceTimestamp verbatim for citations; never reinterpret seconds as minutes.\n' : ''}\n\nCURRENT USER QUESTION:\n${question}\n\nVERIFIED SOURCE EVIDENCE FOR THIS TURN:\n${
     directClaims.length > 0
       ? `DIRECTLY ESTABLISHED ANSWER TEXT (preserve its specific identifying details rather than weakening them):\n${directClaims.join(
           '\n',
@@ -411,10 +414,11 @@ async function planVideoEvidenceQuery(input: {
       const parsed = JSON.parse(serialized) as { resolvedQuestion?: unknown };
       const directive = parseVideoInvestigationDirective(serialized);
       if (!directive) return undefined;
-      const resolvedQuestion =
-        typeof parsed.resolvedQuestion === 'string' && parsed.resolvedQuestion.trim()
-          ? parsed.resolvedQuestion.trim()
-          : input.question;
+      const resolvedQuestion = resolveVideoEvidenceQuestion(
+        input.question,
+        input.previousQuestion,
+        parsed.resolvedQuestion,
+      );
       return { directive, resolvedQuestion };
     };
     const planned = await requestPlan(VIDEO_QUERY_PLANNER_SYSTEM, 320);

@@ -128,7 +128,14 @@ export function planVideoQuestion(
     ),
   ] as VideoQueryPlan['modalities'];
   const kinds = new Set<VideoQuestionKind>();
-  if (investigation.goal === 'answer') kinds.add('visual-fact');
+  if (investigation.goal === 'answer') {
+    if (modalities.includes('visual')) {
+      kinds.add('visual-fact');
+    } else {
+      if (modalities.includes('transcript')) kinds.add('direct-speech');
+      if (modalities.includes('ocr')) kinds.add('exact-ocr');
+    }
+  }
   if (investigation.goal === 'compare') kinds.add('comparison');
   if (investigation.goal === 'trace') kinds.add('state-change');
   if (investigation.goal === 'resolve') kinds.add('outcome');

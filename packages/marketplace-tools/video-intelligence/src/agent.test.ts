@@ -94,6 +94,41 @@ function evidenceContext(overrides: {
 }
 
 describe('Video Intelligence chat extension', () => {
+  it('uses the requested speech modality instead of a more highly ranked visual account', async () => {
+    const speech = hit(
+      'stated-fact',
+      6,
+      'The service stores encrypted files in a shared workspace.',
+      { modality: 'transcript' },
+    );
+    const visual = hit(
+      'unrelated-visual',
+      36,
+      'The service dashboard displays a market growth chart.',
+    );
+    const result: any = await agentClient(vi.fn()).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'What does the service store?',
+        investigation: { scope: 'focused', goal: 'answer', evidence: ['speech'] },
+      },
+      evidenceContext({
+        plan: {
+          kinds: ['direct-speech'],
+          route: 'search',
+          modalities: ['transcript'],
+          requiresInspectionWhenInsufficient: false,
+        },
+        search: async (_query, options) =>
+          Array.isArray(options?.modalities) && options.modalities.includes('transcript')
+            ? [speech]
+            : [visual],
+      }),
+    );
+    expect(result.evidence.map((record: any) => record.id)).toContain('stated-fact');
+    expect(result.evidence.every((record: any) => record.modality === 'transcript')).toBe(true);
+  });
+
   it('starts indexed retrieval while the independent source aggregate is still loading', async () => {
     let releaseAggregate!: (value: undefined) => void;
     const aggregate = new Promise<undefined>((resolve) => {

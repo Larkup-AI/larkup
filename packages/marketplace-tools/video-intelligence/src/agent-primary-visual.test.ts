@@ -32,7 +32,7 @@ describe('primary visual evidence beside reconciled accounts', () => {
         'Happened: operator in blue places the tool on the bench.\nDirect component: The tool rests beside the panel.',
     );
     const search = vi.fn(async (_id, _q, _limit, options) =>
-      options?.modalities?.includes('visual') ? [primary] : summary,
+      options?.modalities?.length === 1 && options.modalities[0] === 'visual' ? [primary] : summary,
     );
     const result: any = await attachVideoIntelligenceAgentClient(
       new VideoIntelligenceClient({ mode: 'local-docker' }),

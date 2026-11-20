@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   reconcileVideoInvestigation,
+  resolveVideoEvidenceQuestion,
   videoSourceTimestamp,
 } from '../src/lib/chat/video-query-planning.ts';
 import { collectExhaustiveVideoEvidencePages } from '../src/lib/chat/video-rag-routing.ts';
@@ -175,4 +176,21 @@ test('source clocks keep seconds distinct from minutes and support long recordin
   assert.equal(videoSourceTimestamp({ startSecs: 13.25, endSecs: 29.9 }), '0:13–0:29');
   assert.equal(videoSourceTimestamp({ startSecs: 3672, endSecs: 3715 }), '1:01:12–1:01:55');
   assert.equal(videoSourceTimestamp({ startSecs: NaN }), undefined);
+});
+
+test('a standalone question is never replaced by a planner-authored answer', () => {
+  for (const question of ['What does the service provide?', 'الخدمة بتقدم إيه؟']) {
+    assert.equal(
+      resolveVideoEvidenceQuestion(question, undefined, 'An invented description.'),
+      question,
+    );
+  }
+  assert.equal(
+    resolveVideoEvidenceQuestion(
+      'And its limits?',
+      'Explain the service.',
+      'What are the service limits?',
+    ),
+    'What are the service limits?',
+  );
 });

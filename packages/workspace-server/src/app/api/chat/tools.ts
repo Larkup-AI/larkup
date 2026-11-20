@@ -471,6 +471,19 @@ export async function queryKnowledgeBase(
     const selectedMediaAsset = directTitleMatchedAsset
       ? newestEquivalentMediaAsset(directTitleMatchedAsset, availableMediaAssets)
       : undefined;
+    const locatorTerms = buildQueryTermMatchers(query);
+    const anotherSourceIsReferenced =
+      selectedMediaAsset &&
+      documents.some(
+        (document) =>
+          document.status === 'indexed' &&
+          document.metadata?.mediaAssetId !== selectedMediaAsset.id &&
+          !selectedMediaAsset.documentIds.includes(document.id) &&
+          countMatchesIn(locatorTerms, document.title) > 0,
+      );
+    if (selectedMediaAsset && !anotherSourceIsReferenced) {
+      return activeMediaFollowUpResult(query, selectedMediaAsset);
+    }
     if (!documents.some((document) => document.status === 'indexed'))
       return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope, mediaAssets, groups);
 
@@ -563,9 +576,10 @@ export async function queryKnowledgeBase(
       // carry only a document id. Resolve it against the active media source
       // here, so the generic chat router can force whichever installed
       // evidence-query action owns that source before a model answers.
-      const resolvedMediaAssetId =
-        selectedMediaAsset?.id ??
-        (await findEvidenceFirstVideoAssetId(formatted, activeVideoRuntimeScope));
+      const resolvedMediaAssetId = await findEvidenceFirstVideoAssetId(
+        formatted,
+        activeVideoRuntimeScope,
+      );
       const resolvedMediaAsset = resolvedMediaAssetId
         ? availableMediaAssets.find((asset) => asset.id === resolvedMediaAssetId)
         : undefined;
@@ -576,7 +590,7 @@ export async function queryKnowledgeBase(
       // its tool is the authority for this turn. Keeping secondary clips in
       // the answer context can both confuse source attribution and spend the
       // answer model's budget on unrelated recordings.
-      const authoritativeMediaAsset = selectedMediaAsset ?? resolvedMediaAsset;
+      const authoritativeMediaAsset = resolvedMediaAsset;
       const scopedHits = authoritativeMediaAsset
         ? formatted.hits.filter(
             (hit: any) =>

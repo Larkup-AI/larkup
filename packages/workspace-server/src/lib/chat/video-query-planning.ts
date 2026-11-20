@@ -72,3 +72,14 @@ export function videoSourceTimestamp(range: {
     ? `${format(start)}–${format(end)}`
     : format(start);
 }
+
+/** Resolve references only when a previous media question actually exists. */
+export function resolveVideoEvidenceQuestion(
+  question: string,
+  previousQuestion: string | undefined,
+  proposed: unknown,
+): string {
+  return previousQuestion?.trim() && typeof proposed === 'string' && proposed.trim()
+    ? proposed.trim()
+    : question;
+}
