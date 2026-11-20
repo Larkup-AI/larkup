@@ -1,5 +1,13 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.26
+
+### Patch Changes
+
+- 1fac545: Respect speech and visible-text evidence when answering factual video questions, preserve standalone user questions verbatim, and locate explicitly named media without redundant global semantic ranking while preserving mixed-source and source-group checks.
+- Updated dependencies [1fac545]
+  - @larkup/core@0.8.7
+
 ## 0.3.25
 
 ### Patch Changes

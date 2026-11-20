@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.8.7
+
+### Patch Changes
+
+- 1fac545: Respect speech and visible-text evidence when answering factual video questions, preserve standalone user questions verbatim, and locate explicitly named media without redundant global semantic ranking while preserving mixed-source and source-group checks.
+
 ## 0.8.6
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @larkup/workspace-server
 
+## 0.2.76
+
+### Patch Changes
+
+- 1fac545: Respect speech and visible-text evidence when answering factual video questions, preserve standalone user questions verbatim, and locate explicitly named media without redundant global semantic ranking while preserving mixed-source and source-group checks.
+- Updated dependencies [1fac545]
+  - @larkup/core@0.8.7
+  - @larkup/marketplace@0.3.17
+  - @larkup/tool-doc-editor@0.3.12
+  - @larkup/scraper@0.2.7
+
 ## 0.2.75
 
 ### Patch Changes

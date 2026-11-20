@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-server",
-  "version": "0.2.75",
+  "version": "0.2.76",
   "type": "module",
   "files": [
     "src",
@@ -337,11 +337,11 @@
     "@ai-sdk/mistral": "4.0.84",
     "@ai-sdk/openai": "4.0.115",
     "@ai-sdk/openai-compatible": "3.0.90",
-    "@larkup/core": "^0.8.6",
+    "@larkup/core": "^0.8.7",
     "@larkup/marketplace": "workspace:*",
     "@larkup/sandbox": "workspace:*",
     "@larkup/scraper": "workspace:*",
-    "@larkup/tool-doc-editor": "^0.3.11",
+    "@larkup/tool-doc-editor": "^0.3.12",
     "@larkup/vector-stores": "workspace:*",
     "@napi-rs/canvas": "1.1.0",
     "ai": "7.0.170",

@@ -1,5 +1,13 @@
 # @larkup/workspace-app
 
+## 0.6.3
+
+### Patch Changes
+
+- Updated dependencies [1fac545]
+  - @larkup/core@0.8.7
+  - @larkup/tool-doc-editor@0.3.12
+
 ## 0.6.2
 
 ### Patch Changes
