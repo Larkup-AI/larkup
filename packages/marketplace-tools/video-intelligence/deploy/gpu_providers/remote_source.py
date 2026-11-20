@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import struct
 from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse
@@ -41,10 +42,48 @@ def materialize_provider_source(
     return None
 
 
+def _complete_mp4_source(path: Path) -> bool:
+    """Reject ISO BMFF headers whose declared media extends past the file."""
+    length = path.stat().st_size
+    with path.open("rb") as source:
+        first = source.read(8)
+        if len(first) < 8 or first[4:] not in (b"ftyp", b"styp"):
+            return True  # Other containers are validated by the decoder.
+        position = 0
+        has_media = False
+        while position < length:
+            source.seek(position)
+            header = source.read(8)
+            if len(header) != 8:
+                return False
+            size, kind = struct.unpack(">I4s", header)
+            header_size = 8
+            if size == 1:
+                extended = source.read(8)
+                if len(extended) != 8:
+                    return False
+                size = struct.unpack(">Q", extended)[0]
+                header_size = 16
+            if size == 0:
+                size = length - position
+            if size < header_size or position + size > length:
+                return False
+            has_media = has_media or (kind == b"mdat" and size > header_size)
+            position += size
+        return has_media
+
+
+def _safe_source_diagnostic(value: str) -> str:
+    value = re.sub(r"https?://[^\s]+", "[source URL]", value)
+    return re.sub(r"(?i)(?:X-Amz-[\w-]+|signature|token|credential)=[^\s&]+", "[redacted]", value)
+
+
 def _download_youtube_source(
     source_url: str,
     destination: Path,
     progress: PreparationProgress | None,
+    *,
+    prefer_hls: bool = False,
 ) -> str | None:
     command = [
         "yt-dlp",
@@ -56,6 +95,9 @@ def _download_youtube_source(
         "--newline",
         "--format",
         (
+            "best[height<=360][protocol^=m3u8][vcodec!=none][acodec!=none]/"
+            "bestvideo[height<=360][protocol^=m3u8]+bestaudio[protocol^=m3u8]"
+            if prefer_hls else
             "bestvideo*[height<=360][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/"
             "best[height<=360][ext=mp4][vcodec!=none][acodec!=none]/"
             "bestvideo*[height<=360]+bestaudio/"
@@ -85,7 +127,7 @@ def _download_youtube_source(
     for raw_line in process.stdout:
         line = raw_line.strip()
         if line:
-            diagnostics.append(line)
+            diagnostics.append(_safe_source_diagnostic(line))
             diagnostics = diagnostics[-40:]
         if line.startswith(YTDLP_METADATA_PREFIX):
             try:
@@ -111,6 +153,13 @@ def _download_youtube_source(
                 "YOUTUBE_VERIFICATION_REQUIRED: YouTube requires verification for this source."
             )
         raise RuntimeError("could not download remote video: " + diagnostic)
+    if not _complete_mp4_source(destination):
+        destination.unlink(missing_ok=True)
+        if not prefer_hls:
+            if progress:
+                progress(1, "The source download was incomplete; recovering from segmented media")
+            return _download_youtube_source(source_url, destination, progress, prefer_hls=True) or extracted_title
+        raise RuntimeError("REMOTE_VIDEO_INCOMPLETE: the downloaded container is missing media bytes")
     if progress:
         progress(99, "Remote video is ready for secure transfer")
     return extracted_title
@@ -339,7 +388,7 @@ def _run_ffmpeg_with_progress(
                 progress(percent, f"Preparing Cloud video ({percent}%)")
                 last_percent = percent
         elif line:
-            diagnostics.append(line)
+            diagnostics.append(_safe_source_diagnostic(line))
     process.stdout.close()
     return_code = process.wait()
     return return_code == 0, "\n".join(diagnostics) or "ffmpeg returned no diagnostic"

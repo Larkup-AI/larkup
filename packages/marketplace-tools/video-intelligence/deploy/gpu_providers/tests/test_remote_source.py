@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import struct
 import shutil
 import subprocess
 import tempfile
@@ -12,6 +13,8 @@ from unittest.mock import MagicMock, patch
 
 from gpu_providers.remote_source import (
     _scaled_preparation_progress,
+    _complete_mp4_source,
+    _safe_source_diagnostic,
     extract_bounded_remote_clip,
     materialize_provider_source,
     materialize_remote_source,
@@ -298,3 +301,45 @@ class RemoteSourceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SourceIntegrityTests(unittest.TestCase):
+    def test_header_only_mp4_is_not_a_complete_recording(self):
+        def box(kind, payload):
+            return struct.pack(">I4s", 8 + len(payload), kind) + payload
+        header = box(b"ftyp", b"isom0000") + box(b"moov", b"metadata")
+        media = box(b"mdat", b"independent media bytes")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "recording.mp4"
+            path.write_bytes(header + media[:8])
+            self.assertFalse(_complete_mp4_source(path))
+            path.write_bytes(header + media)
+            self.assertTrue(_complete_mp4_source(path))
+
+    def test_truncated_download_recovers_once_with_segmented_media(self):
+        def box(kind, payload):
+            return struct.pack(">I4s", 8 + len(payload), kind) + payload
+        header = box(b"ftyp", b"isom0000") + box(b"moov", b"metadata")
+        media = box(b"mdat", b"independent media bytes")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "recording.mp4"
+            calls = []
+            def download(command, **_kwargs):
+                calls.append(command)
+                path.write_bytes(header + (media[:8] if len(calls) == 1 else media))
+                process = MagicMock()
+                process.stdout.__iter__.return_value = iter([])
+                process.wait.return_value = 0
+                return process
+            with patch("gpu_providers.remote_source.subprocess.Popen", side_effect=download):
+                materialize_provider_source("https://www.youtube.com/watch?v=independent", path)
+            self.assertEqual(len(calls), 2)
+            self.assertIn("protocol^=m3u8", calls[1][calls[1].index("--format") + 1])
+            self.assertTrue(_complete_mp4_source(path))
+
+    def test_signed_source_urls_are_removed_before_diagnostic_truncation(self):
+        diagnostic = "decode failed https://storage.example.test/source?X-Amz-Credential=credential-stub&X-Amz-Signature=signature-stub: Invalid data"
+        safe = _safe_source_diagnostic(diagnostic)
+        self.assertNotIn("credential-stub", safe)
+        self.assertNotIn("signature-stub", safe)
+        self.assertIn("Invalid data", safe)
