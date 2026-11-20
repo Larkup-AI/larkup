@@ -31,6 +31,16 @@ export const VIDEO_INVESTIGATION_SKILLS = [
       'For an exhaustive result, follow continuation.nextCursor until hasMore=false; do not mistake one page for the complete answer.',
   },
   {
+    id: 'speaker-attribution',
+    instruction:
+      'For questions and answers by person, preserve each question, its answer, asker, respondent and source timestamps. A diarization label distinguishes voices only inside its transcription chunk; it is not a person name or proof that labels match across chunks. Use source-grounded introductions or visible name labels to establish names. Keep unknown speakers explicitly unknown and unanswered questions unanswered.',
+  },
+  {
+    id: 'long-results',
+    instruction:
+      'Render complete inventories as the returned paginated table with download instead of rewriting a shortened list in prose. For creator workflows such as chapters, lecture notes, clips, quotes or grouped Q&A, keep timestamp provenance and disclose incomplete coverage. Use the corpus sandbox for transformations over mounted source files and larkup_table or larkup_document for complete outputs; never reconstruct the unseen remainder from a sample.',
+  },
+  {
     id: 'preserve-language',
     instruction:
       'Answer in the returned sourceLanguage by default, including notes, speech, and lyrics; translate only when the user explicitly asks. Never default to English.',

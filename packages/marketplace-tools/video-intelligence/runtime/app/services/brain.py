@@ -1389,6 +1389,8 @@ def _source_inventory_chunks(
                 item_start = round(float(item.get("startMs") or 0))
                 item_end = round(float(item.get("endMs") or item_start))
                 text = str(item.get("text") or "").strip()[:text_limit]
+                if item.get("speaker") is not None:
+                    text = f"[Voice {item['speaker']}; {item.get('speakerScope') or 'chunk:0'}] {text}"
                 if text and item_start < end_ms and item_end >= start_ms:
                     selected.append(
                         {"startMs": item_start, "endMs": item_end, "text": text}

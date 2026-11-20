@@ -137,6 +137,9 @@ export interface VideoMaterializationJob {
 }
 
 export interface TranscriptEvidence {
+  speaker?: string;
+  /** Voice labels are comparable only inside this transcription chunk. */
+  speakerScope?: string;
   startMs: number;
   endMs: number;
   text: string;

@@ -89,6 +89,8 @@ def _rebase_segments(
     rebased: list[dict[str, Any]] = []
     for segment in segments:
         copy = {**segment}
+        if copy.get("speaker") is not None:
+            copy["speakerScope"] = f"chunk:{offset_ms}"
         for key in ("startMs", "endMs"):
             if isinstance(copy.get(key), (int, float)):
                 copy[key] = round(float(copy[key])) + offset_ms
@@ -115,6 +117,9 @@ def _timestamped_segment(
         "startMs": round(float(item.get("start", 0)) * 1_000),
         "endMs": round(float(item.get("end", 0)) * 1_000),
         "text": str(item.get("transcript") or item.get("text") or "").strip(),
+        **({"speaker": str(item["speaker"]), "speakerScope": "chunk:0"}
+           if isinstance(item.get("speaker"), (str, int)) and not isinstance(item.get("speaker"), bool)
+           else {}),
         "words": [
             {
                 "startMs": round(float(word.get("start", 0)) * 1_000),
@@ -144,7 +149,7 @@ def _deepgram_segments(results: dict[str, Any]) -> list[dict[str, Any]]:
     alternative = alternatives[0] if alternatives else {}
     paragraphs = (alternative.get("paragraphs") or {}).get("paragraphs") or []
     sentences = [
-        sentence
+        {**sentence, **({"speaker": paragraph["speaker"]} if paragraph.get("speaker") is not None else {})}
         for paragraph in paragraphs
         for sentence in paragraph.get("sentences") or []
         if str(sentence.get("text") or "").strip()
@@ -184,6 +189,7 @@ def _deepgram_segments(results: dict[str, Any]) -> list[dict[str, Any]]:
         word_start = float(word.get("start", 0))
         if current and (
             word_start - previous_end > 1.25 or word_start - group_start >= 15
+            or word.get("speaker") != current[-1].get("speaker")
         ):
             groups.append(current)
             current = []
@@ -197,6 +203,7 @@ def _deepgram_segments(results: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         _timestamped_segment(
             {
+                **({"speaker": group[0]["speaker"]} if group[0].get("speaker") is not None else {}),
                 "start": group[0].get("start", 0),
                 "end": group[-1].get("end", group[0].get("start", 0)),
                 "text": " ".join(
@@ -313,6 +320,7 @@ class DeepgramProvider(TranscriptionProvider):
             ("smart_format", "true"),
             ("punctuate", "true"),
             ("utterances", "true"),
+            ("diarize", "true"),
         ]
         if not automatic_language:
             params.append(("language", language_hint))

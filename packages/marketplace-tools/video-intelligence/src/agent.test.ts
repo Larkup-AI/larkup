@@ -94,6 +94,47 @@ function evidenceContext(overrides: {
 }
 
 describe('Video Intelligence chat extension', () => {
+  it('starts indexed retrieval while the independent source aggregate is still loading', async () => {
+    let releaseAggregate!: (value: undefined) => void;
+    const aggregate = new Promise<undefined>((resolve) => {
+      releaseAggregate = resolve;
+    });
+    let searchStarted = false;
+    const pending = agentClient(vi.fn()).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'Explain the stated service.',
+        investigation: { scope: 'focused', goal: 'answer', evidence: ['speech'] },
+      },
+      evidenceContext({
+        plan: {
+          kinds: ['direct-speech'],
+          route: 'search',
+          modalities: ['transcript'],
+          requiresInspectionWhenInsufficient: false,
+        },
+        aggregate: () => aggregate,
+        search: async () => {
+          searchStarted = true;
+          return [
+            hit('speech', 5, 'The stated service manages shared records.', {
+              modality: 'transcript',
+            }),
+          ];
+        },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      expect(searchStarted).toBe(true);
+    } finally {
+      releaseAggregate(undefined);
+    }
+    const result: any = await pending;
+    expect(result.success).toBe(true);
+    expect(result.evidence.some((record: any) => record.id === 'speech')).toBe(true);
+  });
+
   it('grounds every source-scan answer before exposing visual identities and table claims', async () => {
     const text =
       'Visitor Z moves the object.\nVisible subject: {"identity":"Visitor Z","identityBasis":"unresolved"}\nPresent: Visitor Z — mentioned by narrator\nOn screen: entrance';

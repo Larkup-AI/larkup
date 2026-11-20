@@ -349,3 +349,22 @@ The AWS control plane and GPU provider tests/validation run privately -- see `de
 The runtime is the default path for indexed videos. Removing this package, its
 v3 catalog record, and the optional installed-tool entry cleanly removes the
 implementation.
+
+### Long recordings and creator exports
+
+For a complete question-and-answer inventory, ask the agent to use source scope,
+enumerate, speech evidence, and `recordSet: source-questions`. Follow every
+continuation cursor before presenting a complete result. The shared chat host
+renders the inventory as a paginated, downloadable table; summaries do not
+replace its rows. Keep timestamps and unanswered questions, and report any
+incomplete source coverage. The corpus sandbox can transform mounted source
+files with `larkup_table` or `larkup_document` for grouped Q&A, chapters, lecture
+notes, quotes, and clip plans.
+
+Deepgram transcription requests diarization and preserves voice labels in the
+source evidence. A voice label is scoped to its audio chunk and does not prove
+a person's name or identity across chunks. Use source introductions or visible
+name labels for names and retain unknown attribution explicitly. Supplied
+timestamped transcripts remain available through `transcriptContext` and
+`skipTranscription`; otherwise the existing runtime uses the selected audio
+provider rather than a separate transcription pipeline.

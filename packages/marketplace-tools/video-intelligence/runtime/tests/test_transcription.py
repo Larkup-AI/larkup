@@ -12,6 +12,8 @@ from app.services.transcription import (
     OpenAICompatibleProvider,
     TranscriptionService,
     WhisperProvider,
+    _deepgram_segments,
+    _rebase_segments,
 )
 
 
@@ -74,6 +76,19 @@ class WhisperVoiceDetectionTests(unittest.TestCase):
 
 
 class TranscriptionTests(unittest.TestCase):
+    def test_diarization_keeps_voice_zero_and_scopes_voices_to_their_audio_chunk(self):
+        segments = _deepgram_segments({"utterances": [
+            {"start": 1, "end": 2, "transcript": "A question?", "speaker": 0},
+            {"start": 2, "end": 3, "transcript": "An answer.", "speaker": 1},
+        ]})
+        self.assertEqual([s["speaker"] for s in segments], ["0", "1"])
+        rebased = _rebase_segments(segments, 180)
+        self.assertEqual(rebased[0]["speaker"], "0")
+        self.assertEqual(rebased[0]["speakerScope"], "chunk:180000")
+        self.assertEqual(rebased[0]["text"], "A question?")
+        self.assertEqual(rebased[0]["startMs"], 181000)
+
+
     def test_explicit_entities_become_bounded_hints(self):
         hints = transcription_hints(
             {
@@ -96,6 +111,7 @@ class TranscriptionTests(unittest.TestCase):
             )
         _, kwargs = post.call_args
         self.assertEqual(kwargs["headers"]["Content-Type"], "video/mp4")
+        self.assertIn(("diarize", "true"), kwargs["params"])
         self.assertIn(("language", "ar"), kwargs["params"])
         self.assertNotIn(("language", "multi"), kwargs["params"])
         self.assertIn(("keyterm", "Team One"), kwargs["params"])

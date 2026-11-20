@@ -321,7 +321,13 @@ interface CloudProgressCounters {
 interface VideoEvidence {
   durationMs: number;
   video: { width: number; height: number; fps: number };
-  transcript: Array<{ startMs: number; endMs: number; text: string }>;
+  transcript: Array<{
+    startMs: number;
+    endMs: number;
+    text: string;
+    speaker?: string;
+    speakerScope?: string;
+  }>;
   visualObservations: Array<{
     timeMs: number;
     objects: Array<{ label: string; trackId: number; confidence: number }>;
@@ -850,7 +856,9 @@ export function shouldSkipCloudVideoEmbeddings(
 
 export function assertVideoIntelligenceConfiguration(config: Record<string, unknown>): void {
   const models = resolveVideoJobModelConfiguration(config);
-  if (!/gemini.*(?:flash|vision)|qwen.*vl|gpt-4o|gpt-4\.1/i.test(models.vision.model)) {
+  if (
+    !/gemini.*(?:flash|vision)|qwen.*(?:vl|3\.8-max)|gpt-4o|gpt-4\.1/i.test(models.vision.model)
+  ) {
     throw new Error(
       `Before indexing starts, choose a video-capable vision model. "${models.vision.model}" is not supported for video analysis.`,
     );
@@ -1202,7 +1210,10 @@ export function evidenceToKnowledgeInputs(evidence: VideoEvidence) {
   });
   return {
     transcriptChunks: evidence.transcript.map((segment) => ({
-      text: segment.text,
+      text:
+        segment.speaker !== undefined
+          ? `[Voice ${segment.speaker}; ${segment.speakerScope ?? 'chunk:0'}] ${segment.text}`
+          : segment.text,
       startSecs: segment.startMs / 1_000,
       endSecs: segment.endMs / 1_000,
     })),

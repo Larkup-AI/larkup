@@ -37,6 +37,18 @@ test('explicit complete-source timelines override a temporal top-k plan', () => 
   );
 });
 
+test('complete question inventories retain their authored record set and speech scope', () => {
+  for (const recordSet of ['source-questions', 'source-authored', 'observed'] as const) {
+    assert.deepEqual(
+      reconcileVideoInvestigation(
+        { scope: 'source', goal: 'enumerate', recordSet, evidence: ['speech'] },
+        { hasPosition: false, asksForExhaustiveCoverage: true },
+      ),
+      { scope: 'source', goal: 'enumerate', recordSet, evidence: ['speech'] },
+    );
+  }
+});
+
 test('a broad narrative request remains synthesis rather than a record dump', () => {
   assert.deepEqual(
     reconcileVideoInvestigation(

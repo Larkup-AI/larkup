@@ -25,7 +25,7 @@ export function reconcileVideoInvestigation(
       scope: 'source',
       goal: 'enumerate',
       ...(planned?.evidence?.length ? { evidence: planned.evidence } : {}),
-      recordSet: 'all',
+      recordSet: planned?.recordSet ?? 'all',
     };
   }
   if (signals?.hasPosition === false && planned?.timeRange) {

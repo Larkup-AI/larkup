@@ -212,9 +212,9 @@ export function attachVideoIntelligenceAgentClient(
       // apart. Load it before either answer path so even a conservative source
       // scan retains the visibility ledger when the conversational planner
       // chooses a broader record set than `observed`.
-      const aggregate = mediaEvidence.aggregate
-        ? await mediaEvidence.aggregate(input.mediaAssetId)
-        : undefined;
+      const aggregatePromise = mediaEvidence.aggregate
+        ? mediaEvidence.aggregate(input.mediaAssetId)
+        : Promise.resolve(undefined);
       // Complete inventories are a deterministic database scan, never an
       // expanded Top-K query. The chat route follows the opaque cursor itself,
       // so a model cannot stop early or mistake its context window for source
@@ -223,14 +223,17 @@ export function attachVideoIntelligenceAgentClient(
         const sourceInventory =
           focusedInput.investigation.recordSet === 'source-authored' ||
           focusedInput.investigation.recordSet === 'source-questions';
-        const scanned = await mediaEvidence.scan(input.mediaAssetId, {
-          kind: sourceInventory ? 'source-inventory' : 'all-evidence',
-          cursor: input.cursor,
-          limit: input.limit,
-          ...(!sourceInventory && (plan.modalities?.length ?? 0) > 0
-            ? { modalities: plan.modalities }
-            : {}),
-        });
+        const [aggregate, scanned] = await Promise.all([
+          aggregatePromise,
+          mediaEvidence.scan(input.mediaAssetId, {
+            kind: sourceInventory ? 'source-inventory' : 'all-evidence',
+            cursor: input.cursor,
+            limit: input.limit,
+            ...(!sourceInventory && (plan.modalities?.length ?? 0) > 0
+              ? { modalities: plan.modalities }
+              : {}),
+          }),
+        ]);
         if (scanned) {
           // A source inventory can contain headings, slides, and literal list
           // items too. A question table must contain only source questions;
@@ -337,7 +340,7 @@ export function attachVideoIntelligenceAgentClient(
       // first so a whole-recording overview cannot displace its evidence.
       const explicitRanges = directiveTimeRange(directive, durationSecs);
       const explicitLookupRanges = directiveLookupRanges(directive, durationSecs);
-      const [rankedHits, explicitlyScopedHits] = await Promise.all([
+      const [rankedHits, explicitlyScopedHits, aggregate] = await Promise.all([
         retrieve(mediaEvidence, focusedInput, plan, durationSecs),
         explicitLookupRanges.length > 0
           ? retrieveEvidenceInRanges(
@@ -348,6 +351,7 @@ export function attachVideoIntelligenceAgentClient(
               explicitLookupRanges,
             )
           : Promise.resolve([]),
+        aggregatePromise,
       ]);
       let hits = mergeHits(
         explicitlyScopedHits,

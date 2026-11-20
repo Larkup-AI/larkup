@@ -1854,13 +1854,17 @@ export async function POST(req: Request) {
                 ? { previousQuestion: reusableEvidence.mediaQuestion }
                 : {}),
             };
+            const positionPromise = plannerInput.previousQuestion
+              ? undefined
+              : userSpecifiedSourcePosition(plannerInput);
             const planned = await planVideoEvidenceQuery(plannerInput);
             const resolvedMediaQuestion = planned?.resolvedQuestion ?? userText;
             const plannedInvestigation = planned?.directive;
-            const sourcePosition = await userSpecifiedSourcePosition({
-              ...plannerInput,
-              question: resolvedMediaQuestion,
-            });
+            const sourcePosition = await (positionPromise ??
+              userSpecifiedSourcePosition({
+                ...plannerInput,
+                question: resolvedMediaQuestion,
+              }));
             const investigation = reconcileVideoInvestigation(plannedInvestigation, sourcePosition);
             preloadedVideoInvestigation = investigation;
             const evidenceInput = {
