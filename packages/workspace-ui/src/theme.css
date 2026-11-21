@@ -21,7 +21,7 @@
   --border: #e4e4e7;
   --input: #e4e4e7;
   --ring: oklch(0.5 0.05 50);
-  --sidebar: #f9f7f7;
+  --sidebar: #f9f7f7; /** f9f7f7  f9f9f9 **/
   --sidebar-foreground: oklch(0.45 0.02 55);
   --sidebar-primary: oklch(0 0 0);
   --sidebar-primary-foreground: #ffffff;
