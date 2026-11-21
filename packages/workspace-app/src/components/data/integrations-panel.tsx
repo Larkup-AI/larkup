@@ -9,6 +9,7 @@ import { useNotionAuth } from '../../hooks/use-notion-auth';
 import { useIntegrationAuth } from '../../hooks/use-integration-auth';
 import { integrations } from '@larkup/integrations';
 import { cn } from '../../lib/utils';
+import { integrationIconSource } from '../../lib/integration-icons';
 import { CableIcon, Search } from 'lucide-react';
 import { Button } from '@larkup/workspace-ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
@@ -193,8 +194,10 @@ export function IntegrationsPanel({ onAdded, groupId }: { onAdded: () => void; g
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/30">
                     <img
-                      src={integration.icon}
+                      src={integrationIconSource(integration.icon)}
                       alt={integration.name}
+                      width={24}
+                      height={24}
                       className="size-6 object-contain"
                     />
                   </div>
@@ -295,7 +298,7 @@ export function IntegrationsPanel({ onAdded, groupId }: { onAdded: () => void; g
                 <IntegrationResourcesPanel
                   integration={integration.id}
                   name={integration.name}
-                  icon={integration.icon}
+                  icon={integrationIconSource(integration.icon)}
                   onAdded={onAdded}
                   groupId={groupId}
                   onClose={() => {

@@ -4,6 +4,7 @@ import { workspaceUrl, workspaceFetch as fetch } from '../../host';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import useSWR, { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
@@ -14,7 +15,6 @@ import { WebCrawlerStatus } from './web-crawler-status';
 import { PastePanel } from './paste-panel';
 import { UploadPanel } from './upload-panel';
 import { MediaPanel } from './media-panel';
-import { IntegrationsPanel } from './integrations-panel';
 import { JobsPanel } from './jobs-panel';
 import { FileIndexingJobsPanel, type FileIndexStatus } from './file-indexing-jobs-panel';
 import {
@@ -31,6 +31,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@larkup/worksp
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { fetchJobsWithSync } from '../../lib/jobs-client';
 import { videoRuntimeScopeFromConfig } from '../../lib/media/video-runtime-scope';
+
+const IntegrationsPanel = dynamic(() =>
+  import('./integrations-panel').then((module) => module.IntegrationsPanel),
+);
 
 const fetcher = async <T,>(url: string): Promise<T> => {
   const response = await fetch(url);

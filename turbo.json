@@ -12,7 +12,7 @@
     },
     "@larkup/workspace-app#build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist-types/**", "src/asset-data.json"]
+      "outputs": ["dist-types/**", "src/asset-data.json", "src/integration-icon-data.json"]
     },
     "@larkup/core#build": {
       "dependsOn": []

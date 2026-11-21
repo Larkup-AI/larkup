@@ -604,6 +604,30 @@ test.describe.serial('Data Page', () => {
     await expect(page.getByText('Google Drive', { exact: true })).toHaveCount(0);
   });
 
+  test('integration logos render without separate image requests', async ({ page }) => {
+    await page.route('**/icons/**', (route) => route.abort());
+    await page.route('**/notion.png', (route) => route.abort());
+    await page.route('**/github.svg', (route) => route.abort());
+    await page.goto('/add?subtab=integrations');
+    const logos = page.getByTestId('integration-card').getByRole('img');
+    await expect(logos.first()).toBeVisible();
+    await expect
+      .poll(() =>
+        logos.evaluateAll((images) =>
+          images.every((image) => {
+            const img = image as HTMLImageElement;
+            return img.src.startsWith('data:image/') && img.complete && img.naturalWidth > 0;
+          }),
+        ),
+      )
+      .toBe(true);
+    await page.getByRole('textbox', { name: 'Search integrations' }).fill('Google Drive');
+    await expect(logos).toHaveCount(1);
+    expect(await logos.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(
+      0,
+    );
+  });
+
   test('promotes connected integrations before other supported sources', async ({ page }) => {
     await page.route('**/api/integrations', async (route) => {
       await route.fulfill({

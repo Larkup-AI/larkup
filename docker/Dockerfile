@@ -18,6 +18,8 @@ COPY packages/connections/package.json ./packages/connections/
 COPY packages/core/package.json ./packages/core/
 COPY packages/runtime-kit/package.json ./packages/runtime-kit/
 COPY packages/workspace-ui/package.json ./packages/workspace-ui/
+COPY packages/workspace-app/package.json ./packages/workspace-app/
+COPY packages/workspace-server/package.json ./packages/workspace-server/
 COPY packages/integrations/package.json ./packages/integrations/
 COPY packages/marketplace/package.json ./packages/marketplace/
 COPY packages/sandbox/package.json ./packages/sandbox/
@@ -44,6 +46,7 @@ RUN pnpm --filter @larkup/workspace-ui build
 RUN pnpm --filter @larkup/sandbox build
 RUN pnpm --filter @larkup/integrations build
 RUN pnpm --filter @larkup/tool-doc-editor build
+RUN pnpm --filter @larkup/workspace-app exec node scripts/build-assets.mjs
 RUN pnpm --filter larkup build
 
 FROM base AS runner
