@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { integrations } from '@larkup/integrations';
 import { integrationIconSource } from '../src/lib/integration-icons';
+import { integrationIconBytes } from '../scripts/integration-icon-assets.mjs';
 
 test('every catalog logo is bundled within a small page-wide byte budget', () => {
   const sources = [...new Set(integrations.map(({ icon }) => icon))];
@@ -24,4 +25,15 @@ test('host-defined icon URLs pass through unchanged', () => {
   for (const path of ['https://example.test/logo.svg', '/custom-integration.svg', '__proto__']) {
     assert.equal(integrationIconSource(path), path);
   }
+});
+
+test('catalog filenames resolve independently of filesystem case rules', () => {
+  const assets = { 'icons/Brand.png': Buffer.from('logo bytes').toString('base64') };
+  assert.deepEqual(integrationIconBytes(assets, '/icons/brand.png'), Buffer.from('logo bytes'));
+  assert.deepEqual(integrationIconBytes(assets, '/icons/Brand.png'), Buffer.from('logo bytes'));
+  assert.throws(() => integrationIconBytes(assets, '/icons/missing.png'), /exactly one/);
+  assert.throws(
+    () => integrationIconBytes({ ...assets, 'icons/brand.png': 'YQ==' }, '/icons/brand.png'),
+    /exactly one/,
+  );
 });

@@ -1,6 +1,7 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 import { integrations } from '@larkup/integrations';
+import { integrationIconBytes } from './integration-icon-assets.mjs';
 const root = new URL('../assets/', import.meta.url);
 const assets = {};
 async function visit(directory, prefix = '') {
@@ -20,7 +21,7 @@ await writeFile(new URL('../src/asset-data.json', import.meta.url), JSON.stringi
 const integrationIcons = {};
 for (const icon of [...new Set(integrations.map((integration) => integration.icon))].sort()) {
   if (!icon.startsWith('/')) continue;
-  const bytes = await readFile(new URL(icon.slice(1), root));
+  const bytes = integrationIconBytes(assets, icon);
   const vector = icon.endsWith('.svg');
   const thumbnail = vector
     ? bytes
