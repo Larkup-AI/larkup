@@ -1,5 +1,14 @@
 # @larkup/workspace-app
 
+## 0.6.4
+
+### Patch Changes
+
+- 344f076: Refresh the empty chat greeting and composer, add rotating suggestions with reduced-motion support, and refine the shared empty state and sidebar color.
+- 3a216ea: Bundle small integration logo thumbnails with the lazily loaded Integrations panel to eliminate large per-logo image downloads in Local and Cloud.
+- Updated dependencies [344f076]
+  - @larkup/workspace-ui@0.2.1
+
 ## 0.6.3
 
 ### Patch Changes

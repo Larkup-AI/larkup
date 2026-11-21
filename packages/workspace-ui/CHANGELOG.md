@@ -1,5 +1,11 @@
 # @larkup/workspace-ui
 
+## 0.2.1
+
+### Patch Changes
+
+- 344f076: Refresh the empty chat greeting and composer, add rotating suggestions with reduced-motion support, and refine the shared empty state and sidebar color.
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,5 +1,14 @@
 # larkup
 
+## 0.5.14
+
+### Patch Changes
+
+- Updated dependencies [344f076]
+- Updated dependencies [3a216ea]
+  - @larkup/workspace-app@0.6.4
+  - @larkup/workspace-ui@0.2.1
+
 ## 0.5.13
 
 ### Patch Changes
