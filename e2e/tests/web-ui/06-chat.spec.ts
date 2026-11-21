@@ -6,13 +6,13 @@ test.describe.serial('Chat Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/chat');
     await expect(
-      page.getByText('Chat with your knowledge base').or(page.getByText('Setup Required')).first(),
+      page.getByRole('heading', { name: /How can I help you\?|Setup Required/ }).first(),
     ).toBeVisible({ timeout: 60_000 });
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(
-      page.getByText('Chat with your knowledge base').or(page.getByText('Setup Required')).first(),
+      page.getByRole('heading', { name: /How can I help you\?|Setup Required/ }).first(),
     ).toBeVisible();
   });
 
@@ -46,7 +46,7 @@ test.describe.serial('Chat Page', () => {
       return;
     }
 
-    const chatInput = page.locator('textarea[placeholder*="How can I help you" i]').first();
+    const chatInput = page.getByRole('textbox', { name: 'Chat message', exact: true });
     if (await chatInput.isVisible()) {
       await chatInput.fill('What is Larkup?');
       await chatInput.press('Enter');

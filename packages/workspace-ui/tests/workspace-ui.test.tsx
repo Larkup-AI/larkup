@@ -83,13 +83,22 @@ test('dropzone supports host capabilities and never submits its surrounding form
 test('chat presentation is shared without runtime or provider dependencies', () => {
   const html = renderToStaticMarkup(
     <>
-      <ChatEmptyState action={<a href="/add">Add data</a>} />
+      <ChatEmptyState
+        title="Good evening. How can I help you?"
+        action={<a href="/add">Add data</a>}
+      />
       <ChatUserBubble>Hello</ChatUserBubble>
     </>,
   );
-  assert.match(html, /Chat with your knowledge base/);
+  assert.match(html, /Good evening\. How can I help you\?/);
   assert.match(html, /href="\/add"/);
   assert.match(html, /Hello/);
+});
+
+test('empty state omits title and description when the host provides none', () => {
+  const html = renderToStaticMarkup(<ChatEmptyState mark={<img src="/logo.png" alt="Logo" />} />);
+  assert.doesNotMatch(html, /<h1/);
+  assert.match(html, /logo\.png/);
 });
 
 test('document tables keep semantic markup and host-provided actions', () => {

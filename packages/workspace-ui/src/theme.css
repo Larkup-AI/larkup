@@ -1,4 +1,5 @@
-:root, .larkup-workspace {
+:root,
+.larkup-workspace {
   --background: #fafafa;
   --foreground: oklch(0.15 0.01 50);
   --card: #ffffff;
@@ -20,7 +21,7 @@
   --border: #e4e4e7;
   --input: #e4e4e7;
   --ring: oklch(0.5 0.05 50);
-  --sidebar: #fafafa;
+  --sidebar: #f9f7f7;
   --sidebar-foreground: oklch(0.45 0.02 55);
   --sidebar-primary: oklch(0 0 0);
   --sidebar-primary-foreground: #ffffff;
@@ -36,7 +37,8 @@
   --chart-5: oklch(0.62 0.2 25);
 }
 
-.dark, .dark .larkup-workspace {
+.dark,
+.dark .larkup-workspace {
   --background: #0a0a0a;
   --foreground: #fafafa;
   --card: #1c1c1c;

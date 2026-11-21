@@ -68,7 +68,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Switch } from '../ui/switch';
-import { ChatComposerSurface, ChatEmptyState, ChatMessagesViewport } from '@larkup/workspace-ui';
+import { ChatMessagesViewport } from '@larkup/workspace-ui';
 import {
   answerFeedbackForMessage,
   groundedAnswerFeedbackContext,
@@ -218,6 +218,81 @@ function AttachmentCard({
   );
 }
 
+function getTimeOfDayGreeting() {
+  const hour = new Date().getHours();
+  const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  return `${part}. How can I help you?`;
+}
+
+// Suggestions cycle only while the empty-chat composer has no typed message.
+const CHAT_SUGGESTIONS = [
+  'Ask Larkup',
+  'Describe what happens in this video',
+  'Summarize this chart for me',
+  'Search my knowledge base for a topic',
+  'Pull the key data out of this PDF',
+  'Turn this data into a chart',
+  'Export this table as a file',
+];
+
+function AnimatedPlaceholder({ items }: { items: readonly string[] }) {
+  const [index, setIndex] = useState(0);
+  const [isSliding, setIsSliding] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const updatePreference = () => {
+      setReduceMotion(media.matches);
+      if (media.matches) setIsSliding(false);
+    };
+
+    updatePreference();
+    media.addEventListener('change', updatePreference);
+    return () => media.removeEventListener('change', updatePreference);
+  }, []);
+
+  // Keep each suggestion readable before moving the entire two-line track up.
+  useEffect(() => {
+    if (reduceMotion || items.length < 2) return;
+    const timer = window.setTimeout(() => setIsSliding(true), 3200);
+    return () => window.clearTimeout(timer);
+  }, [index, items.length, reduceMotion]);
+
+  useEffect(() => {
+    if (!isSliding) return;
+    const timer = window.setTimeout(() => {
+      // Reset without a reverse animation. The previous second line now
+      // occupies the first slot at exactly the same screen position.
+      setIndex((current) => (current + 1) % items.length);
+      setIsSliding(false);
+    }, 460);
+    return () => window.clearTimeout(timer);
+  }, [isSliding, items.length]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="h-6 overflow-hidden" aria-hidden="true">
+      <div
+        className={cn(
+          'flex flex-col',
+          isSliding
+            ? '-translate-y-6 transition-transform duration-[460ms] ease-[cubic-bezier(0.22,1,0.36,1)]'
+            : 'translate-y-0',
+        )}
+      >
+        <span className="block h-6 shrink-0 truncate text-[15px] leading-6 text-[#929292] dark:text-[#a6a6a6]">
+          {items[index]}
+        </span>
+        <span className="block h-6 shrink-0 truncate text-[15px] leading-6 text-[#929292] dark:text-[#a6a6a6]">
+          {items[(index + 1) % items.length]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 interface ChatStatus {
   ready: boolean;
   indexed: boolean;
@@ -271,14 +346,22 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [pendingMessage, setPendingMessage] = useState<{ text: string; files?: any } | null>(null);
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
+  const [greeting, setGreeting] = useState('How can I help you?');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    setGreeting(getTimeOfDayGreeting());
+  }, []);
+
+  useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
+
+    // Grow the composer up to 176px, then scroll longer drafts.
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 176)}px`;
+    el.style.overflowY = el.scrollHeight > 176 ? 'auto' : 'hidden';
   }, [input]);
 
   const [currentChatId, setCurrentChatId] = useState<string>(chatId || '');
@@ -954,6 +1037,159 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const ready = status?.ready ?? false;
   const selectedModelData = status?.availableModels?.find((m) => m.id === selectedModel);
 
+  const composerForm = (
+    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
+      {/* ChatGPT-like neutral surface: no colored focus ring, only a quiet gray border. */}
+      <div className="relative rounded-[24px] border border-[#e8e8e8] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.025)] transition-[border-color,box-shadow] duration-150 focus-within:border-[#d6d6d6] focus-within:shadow-[0_1px_4px_rgba(0,0,0,0.045)] dark:border-[#393939] dark:bg-[#262626] dark:shadow-none dark:focus-within:border-[#555555] dark:focus-within:shadow-none">
+        {attachments.length > 0 && (
+          <div className="flex w-full items-center gap-2 overflow-x-auto px-4 pt-2 pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/60">
+            {attachments.map((file, idx) => (
+              <AttachmentCard
+                key={`${file.name}-${idx}`}
+                file={file}
+                onClick={() => {
+                  openCanvas(file, { background: false }).catch((err) => {
+                    toast.error(err.message || 'Failed to open document');
+                  });
+                }}
+                onRemove={() => {
+                  setAttachments((prev) => prev.filter((_, i) => i !== idx));
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        <textarea
+          ref={textareaRef}
+          aria-label="Chat message"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
+          onPaste={(e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            const pastedFiles: File[] = [];
+            for (let i = 0; i < items.length; i++) {
+              if (items[i].kind === 'file') {
+                const file = items[i].getAsFile();
+                if (file) pastedFiles.push(file);
+              }
+            }
+            if (pastedFiles.length > 0) {
+              setAttachments((prev) => [...prev, ...pastedFiles]);
+              const pdfFile = pastedFiles.find(
+                (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
+              );
+              if (pdfFile) {
+                openCanvas(pdfFile, { background: false }).catch((err) => {
+                  toast.error(err.message || 'Failed to auto-open pasted document');
+                });
+              }
+            }
+          }}
+          rows={1}
+          disabled={!ready}
+          placeholder={isEmpty ? '' : 'Ask Larkup'}
+          className="block max-h-44 min-h-[52px] w-full resize-none overflow-y-auto bg-transparent px-12 py-3.5 text-[15px] leading-6 text-[#171717] caret-[#171717] outline-none placeholder:text-[#929292] focus:outline-none focus:ring-0 disabled:opacity-50 dark:text-[#f4f4f4] dark:caret-[#f4f4f4] dark:placeholder:text-[#a6a6a6] [&::-webkit-scrollbar]:hidden"
+        />
+        {isEmpty && !input && (
+          <div className="pointer-events-none absolute top-3.5 right-12 left-12 select-none">
+            <AnimatedPlaceholder items={CHAT_SUGGESTIONS} />
+          </div>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                aria-label="Add attachment or web search"
+                className="absolute bottom-2.5 left-2.5 flex size-8 items-center justify-center rounded-full text-[#454545] transition-colors hover:bg-[#f2f2f2] hover:text-[#171717] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#909090] dark:text-[#dedede] dark:hover:bg-[#393939] dark:hover:text-white"
+              >
+                <Plus className="size-[18px]" />
+              </button>
+            }
+          />
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            className="flex w-56 flex-col gap-1"
+            sideOffset={8}
+          >
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.preventDefault();
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.multiple = true;
+                fileInput.accept = '*/*';
+                fileInput.onchange = async (ev: any) => {
+                  const fileList = ev.target.files;
+                  if (!fileList || fileList.length === 0) return;
+                  const newAttachments = Array.from(fileList) as File[];
+                  setAttachments((prev) => [...prev, ...newAttachments]);
+
+                  const pdfFile = newAttachments.find(
+                    (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
+                  );
+                  if (pdfFile) {
+                    openCanvas(pdfFile, { background: false }).catch((err) => {
+                      toast.error(err.message || 'Failed to auto-open document');
+                    });
+                  }
+                };
+                fileInput.click();
+              }}
+              className="cursor-pointer gap-2"
+            >
+              <Paperclip className="size-4" />
+              <span>Attach Document</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.preventDefault();
+                handleWebSearchToggle();
+              }}
+              className="cursor-pointer justify-between gap-2"
+            >
+              <div className="flex items-center gap-2">
+                <Globe className="size-4" />
+                <span>Web Search</span>
+              </div>
+              <Switch
+                checked={configData?.config?.webSearchEnabled || false}
+                className="pointer-events-none"
+              />
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="hidden">
+          <FileAttachmentButton id="chat-file-attachment" />
+        </div>
+
+        <button
+          type="submit"
+          disabled={!ready || (!input.trim() && attachments.length === 0)}
+          aria-label={isBusy || isDocLoading ? 'Add to queue' : 'Send message'}
+          title={isBusy || isDocLoading ? 'Add to queue' : 'Send'}
+          className="absolute bottom-2.5 right-2.5 flex size-8 items-center justify-center rounded-full bg-[#0d0d0d] text-white transition-colors hover:bg-[#2b2b2b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#909090] disabled:cursor-not-allowed disabled:bg-[#b5b5b5] disabled:text-white disabled:hover:bg-[#b5b5b5] dark:bg-[#f4f4f4] dark:text-[#171717] dark:hover:bg-white dark:disabled:bg-[#555555] dark:disabled:text-[#c5c5c5] dark:disabled:hover:bg-[#555555]"
+        >
+          {isBusy || isDocLoading ? (
+            <ListPlus className="size-4" />
+          ) : (
+            <ArrowUp className="size-4" />
+          )}
+        </button>
+      </div>
+    </form>
+  );
   return (
     <div
       className={cn(
@@ -1290,278 +1526,134 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
       </div>
 
       {/* Messages area */}
-      <ChatMessagesViewport viewportRef={scrollRef} onScroll={handleMessageScroll}>
-        {!ready ? (
-          <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border text-muted-foreground">
-              {statusLoading ? (
-                <Loader2 className="size-6 animate-spin" />
-              ) : (
-                <MessageCircle className="size-7" />
-              )}
-            </div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">
-              {statusLoading
-                ? 'Preparing your workspace'
-                : statusError
-                  ? 'Chat temporarily unavailable'
-                  : 'Setup Required'}
-            </h1>
-            <p className="max-w-md text-sm leading-relaxed text-muted-foreground mb-2">
-              {statusLoading
-                ? 'Loading your chat configuration and available models…'
-                : statusError
-                  ? 'Chat services are temporarily unavailable. Larkup will retry automatically.'
-                  : status?.blockers?.join(' ') ||
-                    'Connect a chat model in Settings to start chatting.'}
-            </p>
-            {!statusLoading && !statusError && (
-              <a
-                href={
-                  status?.blockers?.some((b) => b.includes('API Key') || b.includes('Settings'))
-                    ? '/settings/models'
-                    : '/settings'
-                }
-                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-              >
-                Go to Settings
-              </a>
-            )}
-          </div>
-        ) : isEmpty ? (
-          <ChatEmptyState
-            mark={
-              <>
-                <img src="/logo.png" alt="Logo" className="size-9 dark:hidden" />
-                <img src="/logo-light.png" alt="Logo" className="size-9 dark:block hidden" />
-              </>
-            }
-          />
-        ) : (
-          <div className="flex flex-col gap-0">
-            {messages.map((m, idx) => (
-              <MessageItem
-                key={m.id}
-                message={m}
-                isLast={idx === messages.length - 1}
-                isStreaming={chatStatus === 'streaming'}
-                addToolResult={addToolResult}
-                serverId={projectId}
-                autoOpenSupportingClip={shouldAutoOpenSupportingClip(messages, idx)}
-                regenerate={regenerate}
-                isBusy={isBusy}
-                onFeedback={handleMessageFeedback}
-              />
-            ))}
-            {chatStatus === 'submitted' || isInitializingChat ? (
-              <ThinkingIndicator steps={GENERIC_THINKING_STEPS} icon={GENERIC_THINKING_ICON} />
-            ) : null}
-            {error
-              ? (() => {
-                  const raw = error.message || 'Something went wrong while generating a response.';
-                  // Sanitize: if the message contains URLs or is too long, clean it up
-                  let displayMessage = raw;
-                  if (
-                    raw.includes('rate-limited') ||
-                    raw.includes('rate_limit') ||
-                    raw.includes('429')
-                  ) {
-                    displayMessage =
-                      'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backups. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
-                  } else if (raw.includes('unavailable tool') || raw.includes('NoSuchTool')) {
-                    displayMessage =
-                      'The model tried an unavailable action. Please try your question again.';
-                  } else if (
-                    raw.length > 200 ||
-                    raw.includes('http://') ||
-                    raw.includes('https://')
-                  ) {
-                    displayMessage =
-                      'Something went wrong while generating a response. Please try again.';
-                  }
-                  return (
-                    <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                      <div className="flex-1">
-                        <p className="text-sm text-foreground">{displayMessage}</p>
-                        <button
-                          type="button"
-                          onClick={() => regenerate()}
-                          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-secondary"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Try again
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()
-              : null}
-          </div>
-        )}
-      </ChatMessagesViewport>
-
-      {/* Input area */}
-      {ready && (
-        <div className="relative z-10 mt-auto px-4 pb-5 pt-3 sm:px-6">
-          {queuedMessages.length > 0 && (
-            <MessageQueue
-              items={queuedMessages}
-              onRemove={removeFromQueue}
-              onMoveUp={(id) => moveQueueItem(id, -1)}
-              onMoveDown={(id) => moveQueueItem(id, 1)}
-              onEdit={editQueueItem}
-            />
-          )}
-          <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
-            <ChatComposerSurface>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <button
-                      type="button"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground mt-1"
-                    >
-                      <Plus className="h-4.5 w-4.5" />
-                    </button>
-                  }
-                />
-                <DropdownMenuContent
-                  side="top"
-                  align="start"
-                  className="w-56 gap-1 flex flex-col"
-                  sideOffset={8}
-                >
-                  {/* File Attachment Button hidden input, clicked programmatically */}
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.preventDefault();
-                      const fileInput = document.createElement('input');
-                      fileInput.type = 'file';
-                      fileInput.multiple = true;
-                      fileInput.accept = '*/*';
-                      fileInput.onchange = async (ev: any) => {
-                        const fileList = ev.target.files;
-                        if (!fileList || fileList.length === 0) return;
-                        const newAttachments = Array.from(fileList) as File[];
-                        setAttachments((prev) => [...prev, ...newAttachments]);
-
-                        const pdfFile = newAttachments.find(
-                          (f) =>
-                            f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
-                        );
-                        if (pdfFile) {
-                          openCanvas(pdfFile, { background: false }).catch((err) => {
-                            toast.error(err.message || 'Failed to auto-open document');
-                          });
-                        }
-                      };
-                      fileInput.click();
-                    }}
-                    className="gap-2 cursor-pointer"
-                  >
-                    <Paperclip className="size-4" />
-                    <span>Attach Document</span>
-                  </DropdownMenuItem>
-                  {/* <DropdownMenuSeparator /> */}
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleWebSearchToggle();
-                    }}
-                    className="gap-2 justify-between cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Globe className="size-4" />
-                      <span>Web Search</span>
-                    </div>
-                    <Switch
-                      checked={configData?.config?.webSearchEnabled || false}
-                      className="pointer-events-none"
-                    />
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <div className="hidden">
-                <FileAttachmentButton id="chat-file-attachment" />
-              </div>
-
-              <div className="flex flex-col flex-1 gap-2">
-                {/* Attachments List */}
-                {attachments.length > 0 && (
-                  <div className="flex w-full overflow-x-auto items-center gap-2 px-1 pt-1 pb-2 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/60">
-                    {attachments.map((file, idx) => (
-                      <AttachmentCard
-                        key={`${file.name}-${idx}`}
-                        file={file}
-                        onClick={() => {
-                          openCanvas(file, { background: false }).catch((err) => {
-                            toast.error(err.message || 'Failed to open document');
-                          });
-                        }}
-                        onRemove={() => {
-                          setAttachments((prev) => prev.filter((_, i) => i !== idx));
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
-                  }}
-                  onPaste={(e) => {
-                    const items = e.clipboardData?.items;
-                    if (!items) return;
-                    const pastedFiles: File[] = [];
-                    for (let i = 0; i < items.length; i++) {
-                      if (items[i].kind === 'file') {
-                        const file = items[i].getAsFile();
-                        if (file) pastedFiles.push(file);
-                      }
-                    }
-                    if (pastedFiles.length > 0) {
-                      setAttachments((prev) => [...prev, ...pastedFiles]);
-                      const pdfFile = pastedFiles.find(
-                        (f) =>
-                          f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
-                      );
-                      if (pdfFile) {
-                        openCanvas(pdfFile, { background: false }).catch((err) => {
-                          toast.error(err.message || 'Failed to auto-open pasted document');
-                        });
-                      }
-                    }
-                  }}
-                  rows={1}
-                  disabled={!ready}
-                  placeholder="How can I help you…"
-                  className="max-h-48 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-2 py-2.5 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground scrollbar-none [&::-webkit-scrollbar]:hidden disabled:opacity-50"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={!input.trim() && attachments.length === 0}
-                title={isBusy || isDocLoading ? 'Add to queue' : 'Send'}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-              >
-                {isBusy || isDocLoading ? (
-                  <ListPlus className="h-4.5 w-4.5" />
-                ) : (
-                  <ArrowUp className="h-4.5 w-4.5" />
-                )}
-              </button>
-            </ChatComposerSurface>
-          </form>
+      {ready && isEmpty ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 sm:px-6 [&::-webkit-scrollbar]:hidden -translate-y-[10vh]">
+          <h1 className="text-center text-[23px] font-normal tracking-tight text-[#171717] dark:text-[#f4f4f4] sm:text-[25px]">
+            {greeting}
+          </h1>
+          <div className="w-full max-w-3xl">{composerForm}</div>
         </div>
+      ) : (
+        <>
+          <ChatMessagesViewport viewportRef={scrollRef} onScroll={handleMessageScroll}>
+            {!ready ? (
+              <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border text-muted-foreground">
+                  {statusLoading ? (
+                    <Loader2 className="size-6 animate-spin" />
+                  ) : (
+                    <MessageCircle className="size-7" />
+                  )}
+                </div>
+                <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                  {statusLoading
+                    ? 'Preparing your workspace'
+                    : statusError
+                      ? 'Chat temporarily unavailable'
+                      : 'Setup Required'}
+                </h1>
+                <p className="max-w-md text-sm leading-relaxed text-muted-foreground mb-2">
+                  {statusLoading
+                    ? 'Loading your chat configuration and available models…'
+                    : statusError
+                      ? 'Chat services are temporarily unavailable. Larkup will retry automatically.'
+                      : status?.blockers?.join(' ') ||
+                        'Connect a chat model in Settings to start chatting.'}
+                </p>
+                {!statusLoading && !statusError && (
+                  <a
+                    href={
+                      status?.blockers?.some((b) => b.includes('API Key') || b.includes('Settings'))
+                        ? '/settings/models'
+                        : '/settings'
+                    }
+                    className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    Go to Settings
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0">
+                {messages.map((m, idx) => (
+                  <MessageItem
+                    key={m.id}
+                    message={m}
+                    isLast={idx === messages.length - 1}
+                    isStreaming={chatStatus === 'streaming'}
+                    addToolResult={addToolResult}
+                    serverId={projectId}
+                    autoOpenSupportingClip={shouldAutoOpenSupportingClip(messages, idx)}
+                    regenerate={regenerate}
+                    isBusy={isBusy}
+                    onFeedback={handleMessageFeedback}
+                  />
+                ))}
+                {chatStatus === 'submitted' || isInitializingChat ? (
+                  <ThinkingIndicator steps={GENERIC_THINKING_STEPS} icon={GENERIC_THINKING_ICON} />
+                ) : null}
+                {error
+                  ? (() => {
+                      const raw =
+                        error.message || 'Something went wrong while generating a response.';
+                      // Sanitize: if the message contains URLs or is too long, clean it up
+                      let displayMessage = raw;
+                      if (
+                        raw.includes('rate-limited') ||
+                        raw.includes('rate_limit') ||
+                        raw.includes('429')
+                      ) {
+                        displayMessage =
+                          'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backups. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
+                      } else if (raw.includes('unavailable tool') || raw.includes('NoSuchTool')) {
+                        displayMessage =
+                          'The model tried an unavailable action. Please try your question again.';
+                      } else if (
+                        raw.length > 200 ||
+                        raw.includes('http://') ||
+                        raw.includes('https://')
+                      ) {
+                        displayMessage =
+                          'Something went wrong while generating a response. Please try again.';
+                      }
+                      return (
+                        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+                          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                          <div className="flex-1">
+                            <p className="text-sm text-foreground">{displayMessage}</p>
+                            <button
+                              type="button"
+                              onClick={() => regenerate()}
+                              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-secondary"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Try again
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  : null}
+              </div>
+            )}
+          </ChatMessagesViewport>
+
+          {/* Input area */}
+          {ready && (
+            <div className="relative z-10 mt-auto px-4 pb-5 pt-3 sm:px-6">
+              {queuedMessages.length > 0 && (
+                <MessageQueue
+                  items={queuedMessages}
+                  onRemove={removeFromQueue}
+                  onMoveUp={(id) => moveQueueItem(id, -1)}
+                  onMoveDown={(id) => moveQueueItem(id, 1)}
+                  onEdit={editQueueItem}
+                />
+              )}
+              {composerForm}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

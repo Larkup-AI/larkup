@@ -264,8 +264,8 @@ export function ChatMessagesViewport({
 
 export function ChatEmptyState({
   mark,
-  title = 'Chat with your knowledge base',
-  description = 'Ask questions and get AI-powered answers grounded in your indexed documents.',
+  title,
+  description,
   action,
 }: {
   mark?: ReactNode;
@@ -274,16 +274,22 @@ export function ChatEmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
-      {mark ? (
-        <div className="flex size-14 items-center justify-center rounded-2xl border border-border/60 bg-white/90 text-primary dark:bg-card">
+    <div className="flex flex-col items-center justify-center gap-3 text-center">
+      {mark || title ? (
+        <div className="flex items-center justify-center gap-2.5">
           {mark}
+          {title ? (
+            <h1 className="text-balance text-xl font-semibold tracking-tight text-foreground">
+              {title}
+            </h1>
+          ) : null}
         </div>
       ) : null}
-      <h1 className="text-balance text-xl font-semibold tracking-tight text-foreground">{title}</h1>
-      <p className="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
-        {description}
-      </p>
+      {description ? (
+        <div className="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </div>
+      ) : null}
       {action ? <div className="mt-1">{action}</div> : null}
     </div>
   );
